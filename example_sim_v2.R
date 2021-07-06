@@ -15,8 +15,13 @@
 
 require(tidyverse)
 require(glue)
+# devtools::install_github("lmiratrix/blkvar")
 library( blkvar )
 library( arm )
+
+#####
+# simulation functions
+#####
 
 # function: (# obs, effect size) => (reject null? T/F)
 one_sim <- function(n, J, tau) {
@@ -29,11 +34,13 @@ one_sim <- function(n, J, tau) {
     head( sdat )
     sdat$sid = as.character( 1:nrow(sdat) )
     
+    # Note: gen_indiv_data() is not in CRAN version of package
     dat = blkvar::generate_individual_data( sdat )
     head( dat )
     
     # Switch to FIRC model someday.
     # Or our bayesian modeling to get posteriors.
+    # Currently: RIRC model
     mod = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )
 
     res = as.data.frame( coef( mod )$sid )
@@ -64,6 +71,7 @@ if ( FALSE ) {
 }
 
 # function: (# obs, effect size) => (power)
+#  - runs one_sim NUMSIM times, so we can aggregate across runIDs to get the power
 power_sim <- function(n, J, tau, NUMSIM = 250) {
     cat(glue("Working on n = {n}, tau = {tau}\n\n"))
     rs = tibble( runID = 1:NUMSIM )
@@ -76,66 +84,84 @@ if ( FALSE ) {
     power_sim( 20, 20, 0.2, 3 )
 }
 
+
+#####
+# run power simulation
+#####
+
 # run power simulation:
 #  - n = number of observations
 #  - tau = true effect size
 #  - (real power sim would have more knobs: J, site.size, ICC/variances, etc.)
 df_sim <- expand_grid(
-    n = c(25, 50, 75, 100),
+    # n = c(25, 50, 75, 100),
+    n = c(25, 100),
     J = 20,
-    tau = c(0.01, 0.2, 0.5, 0.8)
+    tau = c(0.01, 0.8)
+    # tau = c(0.01, 0.2, 0.5, 0.8)
 )
 
+# store power_sim() results in df_sim as list column
 df_sim$data = pmap( df_sim, power_sim, NUMSIM = 100 )
 
+# unnest df_sim & record pvalue_one per site
+#  - Q: what is pvalue_one???
 hits = df_sim %>% 
     rename( n_bar = n ) %>%
-    unnest( cols=data )
-hits
-
-hits <- hits %>%
+    unnest( cols=data ) %>%
     mutate( ATE_bin = cut( ATE, 10 ),
-            pvalue_one = pnorm( -t ) )
+            # reject = pvalue <= 0.05,   # doesn't this make more sense?
+            pvalue_one = pnorm( -t ))
 
+# per simulation setting & ATE_bin: 
+#  how often do we reject the null, based on pvalue_one?
 agg_hits =  hits %>%
     group_by( tau, n_bar, ATE_bin ) %>%
     summarise( ATE = mean( ATE ),
                power = mean( pvalue_one <= 0.05 ) )
-
+# # doesn't this make more sense?
+# agg_hits <- hits %>%
+#     group_by(tau, n_bar, ATE_bin) %>%
+#     summarize(ATE = mean(ATE),
+#               power = mean(reject))
 agg_hits
 
-ggplot( agg_hits, aes( ATE, power, col = as.factor(tau) ) ) +
+# Q: why is "power" low for strongly negative ATEs?
+ggplot( agg_hits, aes( x=ATE, y=power, col = as.factor(tau) ) ) +
     facet_wrap( ~ n_bar ) +
     geom_line() + geom_point() +
     geom_hline( yintercept = 0.8 )
 
 
-# And looking at power for a site with a given 0.20 across specifications
+#####
+# visualizing power for sites with ATE=0.2
+#####
+
+# for sites with ATE=0.2, plot power (across sim settings)
 circ20 <- hits %>% filter( abs( ATE - 0.20 ) < 0.02 ) %>%
     group_by( tau, n_bar ) %>%
     summarise( power = mean( pvalue_one <= 0.05 ) )
 head( circ20 )
 
 ggplot( circ20, aes( tau, power, col=as.factor( n_bar) ) ) +
+    geom_point() +
     geom_line() +
     labs( title = "Power to detect a site with 0.20 ATE", 
           x = "Average ATE across sites" )
 
 
-
-filter( hits , abs( ATE - 0.20 ) < 0.02, tau > 0.6 )
-
-
+# for sites with ATE=0.2, plot estimated ATEs (across sim settings)
+#  - note: # of sites with ATE=0.2 depends on J and tau
 hits %>% 
     filter( abs( ATE - 0.20 ) < 0.02 ) %>%
-    ggplot( aes( ATE_hat ) ) +
+    ggplot( aes( x=ATE_hat ) ) +
         facet_wrap( tau ~ n_bar, labeller = label_both ) +
         geom_histogram() +
-    geom_vline( xintercept = 0.2, col="red" )
+        geom_vline( xintercept = 0.2, col="red" )
 
 
 if ( FALSE ) {
-    df_sim_res <- df_sim %>%
+df_sim_res <- df_sim %>%
     rowwise() %>%
     mutate(power = power_sim(n, tau))
 
