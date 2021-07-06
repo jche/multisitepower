@@ -104,13 +104,16 @@ df_sim <- expand_grid(
 # store power_sim() results in df_sim as list column
 df_sim$data = pmap( df_sim, power_sim, NUMSIM = 100 )
 
+
+### Q: what is pvalue_one?
+# - idea: df is high, so pvalue = pnorm(t)
+# - A: so pvalue_one is the p-value for the one-tailed test of whether the true effect is greater than zero
+
 # unnest df_sim & record pvalue_one per site
-#  - Q: what is pvalue_one???
 hits = df_sim %>% 
     rename( n_bar = n ) %>%
     unnest( cols=data ) %>%
     mutate( ATE_bin = cut( ATE, 10 ),
-            # reject = pvalue <= 0.05,   # doesn't this make more sense?
             pvalue_one = pnorm( -t ))
 
 # per simulation setting & ATE_bin: 
@@ -119,14 +122,12 @@ agg_hits =  hits %>%
     group_by( tau, n_bar, ATE_bin ) %>%
     summarise( ATE = mean( ATE ),
                power = mean( pvalue_one <= 0.05 ) )
-# # doesn't this make more sense?
-# agg_hits <- hits %>%
-#     group_by(tau, n_bar, ATE_bin) %>%
-#     summarize(ATE = mean(ATE),
-#               power = mean(reject))
 agg_hits
 
-# Q: why is "power" low for strongly negative ATEs?
+### Q: why is "power" low for strongly negative ATEs?
+# A: we're only looking at the one-tailed test
+
+# plot power vs. ATE size
 ggplot( agg_hits, aes( x=ATE, y=power, col = as.factor(tau) ) ) +
     facet_wrap( ~ n_bar ) +
     geom_line() + geom_point() +
