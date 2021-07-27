@@ -25,12 +25,12 @@ library( arm )
 
 # function: (# obs, effect size) => (reject null? T/F)
 one_sim <- function(n, J, tau) {
-
+    
     sdat = blkvar::generate_multilevel_data( n.bar=n, J=J,
                                              variable.n = FALSE,
-                                            tau.11.star = 0.3,  # tx var
-                                            gamma.10 = tau,  # ATE
-                                            return.sites = TRUE) 
+                                             tau.11.star = 0.3,      # tx var
+                                             gamma.10 = tau,         # ATE
+                                             return.sites = TRUE ) 
     head( sdat )
     sdat$sid = as.character( 1:nrow(sdat) )
     
@@ -40,11 +40,22 @@ one_sim <- function(n, J, tau) {
     
     # Switch to FIRC model someday.
     # Or our bayesian modeling to get posteriors.
-    # Currently: RIRC model
+    # Currently: RIRC model (so no site-by-treatment interactions)
     mod = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )
-
-    res = as.data.frame( coef( mod )$sid )
-    ses = as.data.frame( se.ranef(mod)$sid )
+    
+    # Q: why are standard errors of the random effects constant?
+    # A: site sizes are constant
+    res = as.data.frame( coef( mod )$sid )     # random effects
+    ses = as.data.frame( se.ranef(mod)$sid )   # standard errors
+    
+    # # Q: does SE match the formula?
+    # #  - Q: do we just plug in the residual variance for sigma_m?
+    # # A: no! formula is for something global, SEs are for site random effects...?
+    # # A: no! formula doesn't match standard error of fixed effect of Z either...
+    # # TODO: match up SE with the formula
+    # sigma_hat <- mod %>% resid() %>% sd()
+    # sigma_hat <- resid(mod)^2 %>% sum() / (J*n - 2)
+    # sigma_hat * sqrt(1 / (0.5 * 0.5 * J * n))
 
     res = tibble( sid = rownames( ranef( mod )$sid ),
                   est = res$Z,
@@ -94,11 +105,10 @@ if ( FALSE ) {
 #  - tau = true effect size
 #  - (real power sim would have more knobs: J, site.size, ICC/variances, etc.)
 df_sim <- expand_grid(
-    # n = c(25, 50, 75, 100),
-    n = c(25, 100),
+    n = c(25, 50, 75, 100),
     J = 20,
-    tau = c(0.01, 0.8)
-    # tau = c(0.01, 0.2, 0.5, 0.8)
+    # ICC knob
+    tau = c(0.01, 0.2, 0.5, 0.8)
 )
 
 # store power_sim() results in df_sim as list column
@@ -119,7 +129,7 @@ hits = df_sim %>%
 # per simulation setting & ATE_bin: 
 #  how often do we reject the null, based on pvalue_one?
 agg_hits =  hits %>%
-    group_by( tau, n_bar, ATE_bin ) %>%
+    group_by( tau, n_bar, J, ATE_bin ) %>%
     summarise( ATE = mean( ATE ),
                power = mean( pvalue_one <= 0.05 ) )
 agg_hits
@@ -129,9 +139,17 @@ agg_hits
 
 # plot power vs. ATE size
 ggplot( agg_hits, aes( x=ATE, y=power, col = as.factor(tau) ) ) +
-    facet_wrap( ~ n_bar ) +
-    geom_line() + geom_point() +
+    facet_wrap( ~ n_bar, labeller=label_both ) +
+    geom_line() + 
+    geom_point() +
     geom_hline( yintercept = 0.8 )
+ggsave("plots/power_plot.png")
+
+# issue: for the "small effect" bin, 
+#  increasing tau also happens to increase the true average ATE...
+agg_hits %>%
+    filter(ATE_bin == levels(agg_hits$ATE_bin)[5]) %>%
+    arrange(n_bar)
 
 
 #####
@@ -140,8 +158,10 @@ ggplot( agg_hits, aes( x=ATE, y=power, col = as.factor(tau) ) ) +
 
 # for sites with ATE=0.2, plot power (across sim settings)
 circ20 <- hits %>% filter( abs( ATE - 0.20 ) < 0.02 ) %>%
-    group_by( tau, n_bar ) %>%
-    summarise( power = mean( pvalue_one <= 0.05 ) )
+    group_by( tau, n_bar, J ) %>%
+    summarise( n = n(),
+               ATE_bar = mean(ATE),
+               power = mean( pvalue_one <= 0.05 ) )
 head( circ20 )
 
 ggplot( circ20, aes( tau, power, col=as.factor( n_bar) ) ) +
@@ -149,6 +169,7 @@ ggplot( circ20, aes( tau, power, col=as.factor( n_bar) ) ) +
     geom_line() +
     labs( title = "Power to detect a site with 0.20 ATE", 
           x = "Average ATE across sites" )
+ggsave("plots/power_plot_ATE02.png")
 
 
 # for sites with ATE=0.2, plot estimated ATEs (across sim settings)
@@ -156,9 +177,10 @@ ggplot( circ20, aes( tau, power, col=as.factor( n_bar) ) ) +
 hits %>% 
     filter( abs( ATE - 0.20 ) < 0.02 ) %>%
     ggplot( aes( x=ATE_hat ) ) +
-        facet_wrap( tau ~ n_bar, labeller = label_both ) +
+        facet_grid( tau ~ n_bar, labeller = label_both ) +
         geom_histogram() +
         geom_vline( xintercept = 0.2, col="red" )
+ggsave("plots/power_plot_ATE02_hist.png", width=9, height=4)
 
 
 if ( FALSE ) {
@@ -173,6 +195,14 @@ ggplot(df_sim_res, aes(x=n, y=power, color=tau)) +
     geom_hline(aes(yintercept=0.8), color="red", lty="dashed") +
     coord_cartesian(ylim=c(0,1))
 }
+
+
+#####
+# visualizing power 
+#####
+
+
+
 
 # Note on "effect size" when we have an effect distribution:
 #  - each site has a (random) effect size
