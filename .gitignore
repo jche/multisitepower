@@ -44,3 +44,4 @@ vignettes/*.pdf
 # keep large results and plots off of git
 /plots
 /results
+/meeting_notes
