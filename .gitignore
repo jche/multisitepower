@@ -40,3 +40,7 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# keep large results and plots off of git
+/plots
+/results

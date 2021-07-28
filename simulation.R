@@ -1,54 +1,167 @@
 
 #####
-# Power analysis for individual site effects in multisite trial
+# Power analysis for individual site effects in multisite trial,
+# comparing MLMs to just using each single site
 # 
 # uses blkvar package: devtools::install_github("https://github.com/lmiratrix/blkvar")
 #####
 
-# load packages
-require(plyr)
+library( arm )   # note: loads MASS package
+# devtools::install_github("lmiratrix/blkvar")
+library( blkvar )
+
 require(tidyverse)
-require(blkvar)
-
-library(uuid)
-library(glue)
-library(tictoc)
-
-# setup
-uid = str_sub(UUIDgenerate(), start= -12)
-FILE_NAME = paste("simulation_results_paper/", re.distribution, "_", J, "_", site.size,"_",r.squared*100, "_", uid, sep = "")
-scat("Saving to File '%s'\n", FILE_NAME)
+require(glue)
+require(tictoc)
 
 
-# set simulation parameters: number of sites, R^2, etc.
-J <- 50
-site.size <- 50
-ICC <- 0.30
-r.squared <- 0
+#####
+# simulation functions
+#####
 
-
-
-# run simulation
-
-simulation_function <- function(r) {
-  # generate dataset
-  generate_multilevel_data()
+# given a df for a single site, run a one-sided t-test
+run_t_test <- function(df) {
   
-  # fit hierarchical models
-  fit_model()
-  
-  # evaluate model performance
-  evaluate_model()
-  
-  # output results
-  output_results()
-  
+  df %>%
+    summarize(t = list(t.test(Y1[Z==1], Y0[Z==0], alternative = "greater"))) %>%
+    mutate(ATE_hat_single = t[[1]]$estimate["mean of x"] - t[[1]]$estimate["mean of y"],
+           SE_single = t[[1]]$stderr,
+           t_single = t[[1]]$statistic,
+           pvalue_single = t[[1]]$p.value) %>%
+    select(-t)
 }
 
-# some sort of apply() function here
+# function: (# obs, effect size) => (reject null? T/F)
+#' 
+#'
+#' @param n number of observations per site (constant, for now)
+#' @param J number of sites
+#' @param tau overall ATE
+#' @param ICC 
+#'
+#' @return tibble with J rows, 
+#' @export
+#'
+#' @examples
+one_sim <- function(n, J, tau, ICC, round_sites = 0.05) {
+  
+  # browser()
+  
+  sdat = blkvar::generate_multilevel_data( n.bar=n, J=J,
+                                           variable.n = FALSE,
+                                           tau.11.star = 0.3,      # cross-site tx var
+                                           gamma.10 = tau,         # cross-site ATE
+                                           ICC = ICC,              # ICC
+                                           zero.corr = T,          # don't correlate site intercepts and treatment effects (so treatment group is higher variance)
+                                           return.sites = TRUE,
+                                           verbose = FALSE) %>%
+    mutate(sid = as.character(1:n()),
+           beta.1 = round(beta.1/round_sites) * round_sites)       # round to nearest round_sites
+  
+  # Note: generate_individual_data() is not in CRAN version of package
+  dat = blkvar::generate_individual_data( sdat )
+  head( dat )
+  
+  # run single-site models!
+  res_single <- dat %>%
+    group_by(sid) %>%
+    dplyr::group_modify(~run_t_test(.))
+    # summarize(ttest = list(run_t_test()))
+  
+  # Switch to FIRC model someday.
+  # Or our bayesian modeling to get posteriors.
+  # Currently: RIRC model (so no site-by-treatment interactions)
+  mod = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )
+  
+  res = as.data.frame( coef( mod )$sid )     # random effects
+  ses = as.data.frame( se.ranef(mod)$sid )   # standard errors
+  
+  res = tibble( sid = rownames( ranef( mod )$sid ),
+                est = res$Z,
+                SE = ses$Z,
+                t = est / SE,
+                pvalue = 2*pnorm( -abs(t) ) )
+  
+  res = left_join( res, sdat, by="sid" ) %>%
+    dplyr::select( -u0, -u1, -beta.0 )  %>%
+    rename( ATE_hat = est,
+            ATE = beta.1 )
+  
+  res %>%
+    left_join(res_single, by="sid")
+}
 
 
-# write results to csv
+if ( FALSE ) {
+  os <- one_sim( n=20, J=10, tau=0.2, ICC=0)
+  mean( os$ATE )
+  mean( os$ATE_hat )
+  ggplot( os, aes( ATE, ATE_hat ) ) +
+    geom_point() +
+    geom_abline( slope=1, intercept= 0 )
+}
 
+# function: (# obs, effect size) => (power)
+#  - runs one_sim NUMSIM times, so we can aggregate across runIDs to get the power
+power_sim <- function(n, J, tau, ICC, NUMSIM = 250) {
+  cat(glue("Working on n = {n}, tau = {tau}\n\n"))
+  rs = tibble( runID = 1:NUMSIM )
+  rs$data = map( rs$runID, ~one_sim(n, J, tau, ICC))
+  rs = unnest( rs, cols = data )
+  rs
+}
+
+if ( FALSE ) {
+  power_sim( 20, 20, 0.2, 0, 3 )
+}
+
+
+#####
+# run power simulation
+#####
+
+# run power simulation:
+#  - n = number of observations
+#  - tau = true effect size
+#  - (real power sim would have more knobs: J, site.size, ICC/variances, etc.)
+df_sim <- expand_grid(
+  n   = c(25, 50, 75, 100),
+  J   = 20,
+  ICC = c(0, 0.1, 0.2, 0.3),
+  tau = c(0.01, 0.2, 0.5, 0.8)
+)
+
+# run simulation: store power_sim() results in df_sim as list column
+tic()
+df_sim <- df_sim %>%
+  rowwise() %>%
+  mutate(data = list(power_sim(n, J, tau, ICC, NUMSIM = 1000)))
+toc()
+
+# raw results: unnest df_sim & record pvalue_one per site
+hits = df_sim %>% 
+  rename( n_bar = n ) %>%
+  unnest( cols=data ) %>%
+  mutate( pvalue_one = pnorm( -t ))
+
+
+#####
+# save results
+#####
+
+FNAME <- "sim_results"
+fname <- glue("results/", FNAME, ".csv")
+
+if (file.exists(fname)) {
+  max_runID <- read_csv(fname) %>%
+    pull(runID) %>%
+    max()
+  
+  hits %>% 
+    mutate(runID = runID + max_runID) %>%
+    write_csv(fname, append=T)
+} else {
+  write_csv(hits, fname)
+}
 
 
