@@ -112,7 +112,7 @@ one_sim <- function(n, J, tau, ICC, round_sites = 0.05) {
 }
 
 
-if ( TRUE ) {
+if ( FALSE ) {
   os <- one_sim( n=200, J=200, tau=0.2, ICC=1)
   mean( os$ATE )
   mean( os$ATE_hat )
@@ -124,7 +124,7 @@ if ( TRUE ) {
 # function: (# obs, effect size) => (power)
 #  - runs one_sim NUMSIM times, so we can aggregate across runIDs to get the power
 power_sim <- function(n, J, tau, ICC, NUMSIM = 250) {
-  cat(glue("Working on n = {n}, tau = {tau}\n\n"))
+  cat(glue("Working on n = {n}, tau = {tau}, ICC = {ICC}\n\n"))
   rs = tibble( runID = 1:NUMSIM )
   rs$data = map( rs$runID, ~one_sim(n, J, tau, ICC))
   rs = unnest( rs, cols = data )
@@ -146,8 +146,8 @@ if ( FALSE ) {
 #  - (real power sim would have more knobs: J, site.size, ICC/variances, etc.)
 df_sim <- expand_grid(
   n   = c(25, 50, 75, 100),
-  J   = 20,
-  ICC = c(0, 0.1, 0.2, 0.3),
+  J   = c(20),
+  ICC = c(0, 0.5, 1, 2),   # equiv to ICC = c(0, 0.33, 0.5, 0.67)
   tau = c(0.01, 0.2, 0.5, 0.8)
 )
 
@@ -155,7 +155,7 @@ df_sim <- expand_grid(
 tic()
 df_sim <- df_sim %>%
   rowwise() %>%
-  mutate(data = list(power_sim(n, J, tau, ICC, NUMSIM = 1000)))
+  mutate(data = list(power_sim(n, J, tau, ICC, NUMSIM = 900)))
 toc()
 
 # raw results: unnest df_sim & record pvalue_one per site
@@ -169,7 +169,7 @@ hits = df_sim %>%
 # save results
 #####
 
-FNAME <- "sim_results"
+FNAME <- "sim_results_ICC"
 fname <- glue("results/", FNAME, ".csv")
 
 if (file.exists(fname)) {
