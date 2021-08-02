@@ -49,18 +49,38 @@ one_sim <- function(n, J, tau, ICC, round_sites = 0.05) {
   
   sdat = blkvar::generate_multilevel_data( n.bar=n, J=J,
                                            variable.n = FALSE,
-                                           tau.11.star = 0.3,      # cross-site tx var
-                                           gamma.10 = tau,         # cross-site ATE
-                                           ICC = ICC,              # ICC
-                                           zero.corr = T,          # don't correlate site intercepts and treatment effects (so treatment group is higher variance)
+                                           tau.11.star = 0.3,   # cross-site tx var
+                                           gamma.10 = tau,      # cross-site ATE
+                                           ICC = ICC,           # ICC [NOTE: really var(intercepts)]
+                                           rho2.0W = 0,         # covariate has no explanatory power 
+                                           rho2.1W = 0,
+                                           zero.corr = T,       # don't correlate site intercepts and treatment effects (so treatment group is higher variance)
                                            return.sites = TRUE,
                                            verbose = FALSE) %>%
     mutate(sid = as.character(1:n()),
-           beta.1 = round(beta.1/round_sites) * round_sites)       # round to nearest round_sites
+           beta.1 = round(beta.1/round_sites) * round_sites)    # round to nearest round_sites
+  head(sdat)
   
   # Note: generate_individual_data() is not in CRAN version of package
   dat = blkvar::generate_individual_data( sdat )
   head( dat )
+  
+  # conclusion: "ICC" argument is just Var(\alpha_i), NOT the ICC itself!
+  if (FALSE) {
+    var(sdat$beta.0)
+    var(sdat$u0)   # what is u0? has to do with covariate, I think...?
+    
+    # cross-site variation: 1 + ICC for control group
+    dat %>%
+      group_by(Z) %>%
+      summarize(var = var(Yobs))
+    
+    # within-site variation: always 1
+    dat %>%
+      group_by(Z, sid) %>%
+      summarize(var = var(Yobs)) %>%
+      summarize(mn_var = mean(var))
+  }
   
   # run single-site models!
   res_single <- dat %>%
@@ -92,8 +112,8 @@ one_sim <- function(n, J, tau, ICC, round_sites = 0.05) {
 }
 
 
-if ( FALSE ) {
-  os <- one_sim( n=20, J=10, tau=0.2, ICC=0)
+if ( TRUE ) {
+  os <- one_sim( n=200, J=200, tau=0.2, ICC=1)
   mean( os$ATE )
   mean( os$ATE_hat )
   ggplot( os, aes( ATE, ATE_hat ) ) +
