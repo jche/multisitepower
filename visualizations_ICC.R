@@ -39,7 +39,7 @@ ggplot( agg_hits, aes( x=ATE, y=power, col = as.factor(tau) ) ) +
   geom_point(alpha=0.5) +
   geom_hline( yintercept = 0.8 ) +
   geom_vline( xintercept = 0 )
-# ggsave("plots/power_plot.png")
+# ggsave("plots/power_plot_ICC.png")
 
 
 #####
@@ -49,16 +49,17 @@ ggplot( agg_hits, aes( x=ATE, y=power, col = as.factor(tau) ) ) +
 # for sites with ATE=0.2, plot power (across sim settings)
 circ20 <- hits %>% 
   filter( ATE == 0.2 ) %>%
-  group_by( tau, n_bar, J ) %>%
+  group_by( tau, n_bar, J, ICC ) %>%
   summarise( n = n(),
              power = mean( pvalue_one <= 0.05 ) )
 
 ggplot( circ20, aes( tau, power, col=as.factor( n_bar) ) ) +
   geom_point() +
-  geom_line() +
+  geom_line(aes(lty = factor(ICC))) +
+  facet_wrap(~ICC) +
   labs( title = "Power to detect a site with 0.20 ATE", 
         x = "Average ATE across sites" )
-# ggsave("plots/power_plot_ATE02.png")
+# ggsave("plots/power_plot_ATE02_ICC.png")
 
 
 # for sites with ATE=0.2, plot estimated ATEs (across sim settings)
@@ -80,7 +81,7 @@ hits %>%
 # aggregated power results:
 # per simulation setting & ATE value, how often do we reject the null using pvalue_one?
 agg_hits =  hits %>%
-  group_by( tau, n_bar, J, ATE ) %>%
+  group_by( tau, n_bar, J, ICC, ATE ) %>%
   summarise( power = mean( pvalue_one <= 0.05 ),
              power_single = mean(pvalue_single <= 0.05))
 
@@ -89,9 +90,9 @@ agg_hits %>%
   pivot_longer(cols = c(power, power_single),
                names_to = "class",
                values_to = "power") %>%
-  ggplot(aes(x=ATE, y=power, group=class, color=class)) +
+  ggplot(aes(x=ATE, y=power, group=interaction(class, ICC), color=class)) +
   geom_point() +
-  geom_line() +
+  geom_line(aes(lty = factor(ICC))) +
   facet_grid(tau ~ n_bar, labeller = label_both) +
   coord_cartesian(xlim = c(-0.5, 1)) +
   geom_hline(aes(yintercept=0.8)) +
@@ -99,6 +100,7 @@ agg_hits %>%
 # ggsave("plots/power_plot_comp.png")
 
 # bar chart of reject/no-reject for each site
+#  - note: ICC doesn't seem to have much of an effect here
 hits %>%
   mutate(rej = pvalue_one <= 0.05,
          rej_single = pvalue_single <= 0.05) %>%
