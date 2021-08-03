@@ -117,7 +117,7 @@ one_sim <- function(n, J, tau, ICC, round_sites = 0.05) {
 }
 
 
-if ( T ) {
+if ( F ) {
   os <- one_sim( n=200, J=200, tau=0.2, ICC=0.3)
   mean( os$ATE )
   mean( os$ATE_hat )
