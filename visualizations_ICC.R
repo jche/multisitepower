@@ -15,10 +15,25 @@ require(tictoc)
 # Load simulation results
 #####
 
-FNAME <- "sim_results_ICC"
+FNAME <- "sim_results_ICC_fixed"
 
 fname <- glue("results/", FNAME, ".csv")
-hits <- read_csv(fname)
+hits <- read_csv(fname) %>%
+  mutate(n_bar = as.factor(n_bar),
+         ICC = as.factor(ICC),
+         tau = as.factor(tau))
+
+
+#####
+# Global settings
+#####
+
+ALPHA <- 0.1
+
+hits2 <- hits %>%
+  filter(n_bar %in% c(25, 50, 100),
+         ICC %in% c(0, 0.3, 0.9),
+         tau %in% c(0.01, 0.2, 0.8))
 
 
 #####
@@ -29,17 +44,19 @@ hits <- read_csv(fname)
 # per simulation setting & ATE value, how often do we reject the null using pvalue_one?
 agg_hits =  hits %>%
   group_by( tau, n_bar, J, ICC, ATE ) %>%
-  summarise( power = mean( pvalue_one <= 0.05 ) )
+  summarise( power = mean( pvalue_one <= ALPHA ) )
 
 # plot power vs. ATE size
-ggplot( agg_hits, aes( x=ATE, y=power, col = as.factor(tau) ) ) +
+ggplot( agg_hits, aes( x=ATE, y=power, col=tau ) ) +
   facet_grid(ICC ~ n_bar, labeller=label_both ) +
-  # geom_smooth(se=F) +
   geom_line() +
-  geom_point(alpha=0.5) +
-  geom_hline( yintercept = 0.8 ) +
-  geom_vline( xintercept = 0 )
-# ggsave("plots/power_plot_ICC.png")
+  # geom_point(alpha=0.5) +
+  geom_hline( yintercept = 0.8, lty = "dashed" ) +
+  geom_hline( yintercept = ALPHA, lty = "dashed" ) +
+  geom_vline( xintercept = 0 ) +
+  coord_cartesian(xlim = c(-0.5, 1)) +
+  labs(title = glue("Power (\u03B1 = {ALPHA}) vs. true ATE"))
+ggsave("writeup/images/power_plot.png", width=200, height=150, units="mm")
 
 
 #####
@@ -51,74 +68,62 @@ circ20 <- hits %>%
   filter( ATE == 0.2 ) %>%
   group_by( tau, n_bar, J, ICC ) %>%
   summarise( n = n(),
-             power = mean( pvalue_one <= 0.05 ) )
+             power = mean( pvalue_one <= ALPHA ) )
 
-ggplot( circ20, aes( tau, power, col=as.factor( n_bar) ) ) +
+ggplot( circ20, aes( x=tau, y=power, col=ICC, group=interaction(n_bar, ICC) ) ) +
   geom_point() +
-  geom_line(aes(lty = factor(ICC))) +
-  facet_wrap(~ICC) +
-  labs( title = "Power to detect a site with 0.20 ATE", 
-        x = "Average ATE across sites" )
-# ggsave("plots/power_plot_ATE02_ICC.png")
+  geom_line() +
+  geom_hline(yintercept=0.8, lty="dashed") +
+  facet_grid(~n_bar, labeller=label_both) +
+  labs( title = glue("Power (\u03B1 = {ALPHA}) to detect a site with ATE=0.2"), 
+        x = "tau" )
+ggsave("writeup/images/power_plot_ATE02.png", width=200, height=75, units="mm")
 
 
 # for sites with ATE=0.2, plot estimated ATEs (across sim settings)
 #  - note: # of sites with ATE=0.2 depends on J and tau
-hits %>% 
+hits2 %>% 
   filter( ATE == 0.2 ) %>%
   ggplot( aes( x=ATE_hat ) ) +
-  geom_histogram(aes(y = ..density.., fill=factor(ICC), group=ICC), 
-                 position="identity", alpha=0.3) +
+  geom_density(aes(color=tau, group=tau), 
+                 position="identity", fill="transparent") +
   geom_vline( xintercept = 0.2, col="red" ) +
-  facet_grid( tau ~ n_bar, labeller = label_both )
-# ggsave("plots/power_plot_ATE02_hist.png", width=9, height=4)
+  facet_grid( ICC ~ n_bar, labeller = label_both ) +
+  labs(title = "Estimated ATEs for sites with ATE=0.2")
+ggsave("writeup/images/power_plot_ATE02_dens.png", width=200, height=150, units="mm")
+
 
 
 #####
 # visualizing power vs. ATE, comparing MLMs to single-site estimates
 #####
 
-# aggregated power results:
-# per simulation setting & ATE value, how often do we reject the null using pvalue_one?
 agg_hits =  hits %>%
   group_by( tau, n_bar, J, ICC, ATE ) %>%
-  summarise( power = mean( pvalue_one <= 0.05 ),
-             power_single = mean(pvalue_single <= 0.05))
+  summarise( power = mean( pvalue_one <= ALPHA ),
+             power_single = mean(pvalue_single <= ALPHA) )
 
 # power vs. ATE, comparing multi-site to single-site
 agg_hits %>%
   pivot_longer(cols = c(power, power_single),
-               names_to = "class",
+               names_to = "estimator",
                values_to = "power") %>%
-  ggplot(aes(x=ATE, y=power, group=interaction(class, ICC), color=class)) +
-  geom_point() +
-  geom_line(aes(lty = factor(ICC))) +
-  facet_grid(tau ~ n_bar, labeller = label_both) +
+  mutate(estimator = ifelse(estimator == "power", "MLM", "single-site")) %>%
+  ggplot(aes(x=ATE, y=power, group=interaction(estimator, tau), color=tau)) +
+  # geom_point() +
+  geom_line(aes(lty=estimator)) +
+  facet_grid(ICC ~ n_bar, labeller = label_both) +
   coord_cartesian(xlim = c(-0.5, 1)) +
-  geom_hline(aes(yintercept=0.8)) +
-  geom_vline(aes(xintercept=0))
-# ggsave("plots/power_plot_comp.png")
+  geom_hline(aes(yintercept=0.8), lty="dashed") +
+  geom_hline(aes(yintercept=ALPHA), lty="dashed") +
+  geom_vline(aes(xintercept=0)) +
+  labs(title = glue("Power (\u03B1 = {ALPHA}) vs. true ATE"),
+       subtitle = "(comparison of MLM and single-site estimates)")
+ggsave("writeup/images/power_plot_comp.png", width=200, height=150, units="mm")
 
-# bar chart of reject/no-reject for each site
-#  - note: ICC doesn't seem to have much of an effect here
-hits %>%
-  mutate(rej = pvalue_one <= 0.05,
-         rej_single = pvalue_single <= 0.05) %>%
-  group_by(ATE, tau, n_bar) %>%
-  summarize(both = sum(rej & rej_single),
-            neither = sum(!rej & !rej_single),
-            multi_only = sum(rej & !rej_single),
-            single_only = sum(!rej & rej_single)) %>%
-  pivot_longer(cols = c(both, neither, multi_only, single_only),
-               names_to = "rejections",
-               values_to = "n") %>%
-  # mutate(rejections = factor(rejections, levels = c("both", "neither", "multi_only", "single_only"))) %>%
-  ggplot(aes(x=ATE, y=n, fill=rejections)) +
-  geom_col(position = "identity", alpha=0.5) +
-  facet_grid(tau ~ n_bar, labeller=label_both)
-# ggsave("plots/reject_comp.png", width=9, height=4)
 
-# # same as above, with proportions
+# # bar chart of reject/no-reject for each site
+# #  - note: ICC doesn't seem to have much of an effect here
 # hits %>%
 #   mutate(rej = pvalue_one <= 0.05,
 #          rej_single = pvalue_single <= 0.05) %>%
@@ -130,26 +135,53 @@ hits %>%
 #   pivot_longer(cols = c(both, neither, multi_only, single_only),
 #                names_to = "rejections",
 #                values_to = "n") %>%
+#   # mutate(rejections = factor(rejections, levels = c("both", "neither", "multi_only", "single_only"))) %>%
 #   ggplot(aes(x=ATE, y=n, fill=rejections)) +
-#   geom_col(position = "fill") +
+#   geom_col(position = "identity", alpha=0.5) +
 #   facet_grid(tau ~ n_bar, labeller=label_both)
+# # ggsave("plots/reject_comp.png", width=9, height=4)
 
 
 #####
 # visualizing power for sites with ATE=0.2, comparing MLMs to single-site
 #####
 
+# for sites with ATE=0.2, plot power (across sim settings)
+circ20 <- hits %>% 
+  filter( ATE == 0.2 ) %>%
+  group_by( tau, n_bar, J, ICC ) %>%
+  summarise( n = n(),
+             power = mean( pvalue_one <= ALPHA ),
+             power_single = mean(pvalue_single <= ALPHA))
+
+circ20 %>%
+  pivot_longer(cols = c(power, power_single),
+               names_to = "estimator",
+               values_to = "power") %>%
+  mutate(estimator = ifelse(estimator == "power", "MLM", "single-site")) %>%
+ggplot( aes( x=tau, y=power, col=ICC, group=interaction(n_bar, ICC, estimator) ) ) +
+  geom_point() +
+  geom_line(aes(lty = estimator)) +
+  geom_hline(yintercept=0.8, lty="dashed") +
+  facet_grid(~n_bar, labeller=label_both) +
+  labs( title = glue("Power (\u03B1 = {ALPHA}) to detect a site with ATE=0.2"), 
+        x = "tau" )
+ggsave("writeup/images/power_plot_comp_ATE02.png", width=200, height=75, units="mm")
+
+
 # for sites with ATE=0.2, plot estimated ATEs (across sim settings)
 #  - note: # of sites with ATE=0.2 depends on J and tau
 hits %>% 
-  filter( ATE == 0.2 ) %>%
+  filter( ATE == 0.2, ICC==0 ) %>%
   pivot_longer(cols = c(ATE_hat, ATE_hat_single),
-               names_to = "class",
+               names_to = "estimator",
                values_to = "ATE_hat") %>%
-  ggplot( aes( x=ATE_hat, group=class, color=class, fill=class ) ) +
+  mutate(estimator = ifelse(estimator == "ATE_hat", "MLM", "single-site")) %>%
+  ggplot( aes( x=ATE_hat, group=estimator, color=estimator ) ) +
   facet_grid( tau ~ n_bar, labeller = label_both ) +
-  geom_histogram(aes(y = ..density..), position = "identity", alpha=0.5) +
-  geom_vline( xintercept = 0.2, col="red" )
-# ggsave("plots/hist_comp.png", width=9, height=4)
-
+  geom_density(position = "identity", fill="transparent") +
+  geom_vline( xintercept = 0.2, col="red" ) +
+  labs(title = "Estimated ATEs for sites with ATE=0.2",
+       subtitle = "(ICC = 0)")
+ggsave("writeup/images/power_plot_comp_ATE02_dens.png", width=200, height=150, units="mm")
 

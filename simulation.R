@@ -63,6 +63,8 @@ one_sim <- function(n, J, tau, ICC, round_sites = 0.05) {
            beta.1 = round(beta.1/round_sites) * round_sites)    # round to nearest round_sites
   head(sdat)
   
+  # sdat$beta.1[1] <- 0.2   # idea: makes one site with treatment effect 0.2.
+  
   # Note: generate_individual_data() is not in CRAN version of package
   # dat = blkvar::generate_individual_data( sdat )
   dat = generate_individual_data(sdat,
