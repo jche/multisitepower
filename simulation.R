@@ -43,17 +43,15 @@ run_t_test <- function(df) {
 #' @export
 #'
 #' @examples
-one_sim <- function(n, J, tau, ICC, round_sites = 0.05) {
+one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
   
   # browser()
   
   sdat = blkvar::generate_multilevel_data( n.bar=n, J=J,
                                            variable.n = FALSE,
-                                           tau.11.star = 0.3,   # cross-site tx var
+                                           tau.11.star = tx_var,   # cross-site tx var
                                            gamma.10 = tau,      # cross-site ATE
-                                           ICC = ICC,           # ICC [really var(intercepts)!]
-                                           # ICC = var_alpha,
-                                           # sigma2.e = var_eps,
+                                           ICC = ICC,           # ICC [really var(intercepts)]
                                            rho2.0W = 0,         # covariate has no explanatory power 
                                            rho2.1W = 0,
                                            zero.corr = T,       # don't correlate site intercepts and treatment effects (so treatment group is higher variance)
@@ -61,9 +59,14 @@ one_sim <- function(n, J, tau, ICC, round_sites = 0.05) {
                                            verbose = FALSE) %>%
     mutate(sid = as.character(1:n()),
            beta.1 = round(beta.1/round_sites) * round_sites)    # round to nearest round_sites
+  
+  # manually add in a site with ATE = 0.2
+  if (tx_var == 0) {
+    sdat$beta.1[1] <- 0.2   # idea: set treatment effect for site 1 to 0.2, so there is at least one site with ATE=0.2 for our visualizations
+  }
+  
   head(sdat)
   
-  # sdat$beta.1[1] <- 0.2   # idea: makes one site with treatment effect 0.2.
   
   # Note: generate_individual_data() is not in CRAN version of package
   # dat = blkvar::generate_individual_data( sdat )
@@ -93,7 +96,6 @@ one_sim <- function(n, J, tau, ICC, round_sites = 0.05) {
   res_single <- dat %>%
     group_by(sid) %>%
     dplyr::group_modify(~run_t_test(.))
-    # summarize(ttest = list(run_t_test()))
   
   # Switch to FIRC model someday.
   # Or our bayesian modeling to get posteriors.
@@ -107,20 +109,21 @@ one_sim <- function(n, J, tau, ICC, round_sites = 0.05) {
                 est = res$Z,
                 SE = ses$Z,
                 t = est / SE,
-                pvalue = 2*pnorm( -abs(t) ) )
+                pvalue_one = pnorm(-t))
   
   res = left_join( res, sdat, by="sid" ) %>%
-    dplyr::select( -u0, -u1, -beta.0 )  %>%
+    dplyr::select( -W, -u0, -u1, -beta.0 )  %>%
     rename( ATE_hat = est,
             ATE = beta.1 )
   
   res %>%
-    left_join(res_single, by="sid")
+    left_join(res_single, by="sid") %>%
+    mutate(is_singular = isSingular(mod))   # indicate if model fit was singular
 }
 
 
 if ( F ) {
-  os <- one_sim( n=200, J=200, tau=0.2, ICC=0.3)
+  os <- one_sim( n=200, J=200, tau=0.2, ICC=0.3, tx_var=0.3)
   mean( os$ATE )
   mean( os$ATE_hat )
   ggplot( os, aes( ATE, ATE_hat ) ) +
@@ -130,16 +133,16 @@ if ( F ) {
 
 # function: (# obs, effect size) => (power)
 #  - runs one_sim NUMSIM times, so we can aggregate across runIDs to get the power
-power_sim <- function(n, J, tau, ICC, NUMSIM = 250) {
-  cat(glue("Working on n = {n}, tau = {tau}, ICC = {ICC}\n\n"))
+power_sim <- function(n, J, tau, ICC, tx_var, NUMSIM = 250) {
+  cat(glue("Working on n = {n}, tau = {tau}, ICC = {ICC}, tx_var = {tx_var}\n\n"))
   rs = tibble( runID = 1:NUMSIM )
-  rs$data = map( rs$runID, ~one_sim(n, J, tau, ICC))
+  rs$data = map( rs$runID, ~one_sim(n, J, tau, ICC, tx_var))
   rs = unnest( rs, cols = data )
   rs
 }
 
 if ( FALSE ) {
-  power_sim( 20, 20, 0.2, 0, 3 )
+  power_sim( n=20, J=20, tau=0.2, ICC=0, tx_var=0, NUMSIM=3 )
 }
 
 
@@ -147,40 +150,37 @@ if ( FALSE ) {
 # run power simulation
 #####
 
-# run power simulation:
-#  - n = number of observations
-#  - tau = true effect size
-#  - (real power sim would have more knobs: J, site.size, ICC/variances, etc.)
+# simulation settings
 df_sim <- expand_grid(
   n   = c(25, 50, 75, 100),
   J   = c(20),
-  # ICC = c(0, 0.5, 1, 2),   # equiv to ICC = c(0, 0.33, 0.5, 0.67)
   ICC = c(0, 0.3, 0.6, 0.9),
-  tau = c(0.01, 0.2, 0.5, 0.8)
+  tau = c(0.01, 0.2, 0.5, 0.8),
+  tx_var = c(0.3)
 )
 
 # run simulation: store power_sim() results in df_sim as list column
 tic()
 df_sim <- df_sim %>%
   rowwise() %>%
-  mutate(data = list(power_sim(n, J, tau, ICC, NUMSIM = 400)))
+  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 1)))
 toc()
 
 # raw results: unnest df_sim & record pvalue_one per site
 hits = df_sim %>% 
   rename( n_bar = n ) %>%
-  unnest( cols=data ) %>%
-  mutate( pvalue_one = pnorm( -t ))
+  unnest( cols=data )
 
 
 #####
 # save results
 #####
 
-FNAME <- "sim_results_ICC_fixed"
+FNAME <- "sim_results_txvar03"
 fname <- glue("results/", FNAME, ".csv")
 
 if (file.exists(fname)) {
+  # ASSUMING that all sim settings are run equally
   max_runID <- read_csv(fname) %>%
     pull(runID) %>%
     max()
