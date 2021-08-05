@@ -56,7 +56,7 @@ ggplot( agg_hits, aes( x=ATE, y=power, col=tau ) ) +
   geom_vline( xintercept = 0 ) +
   coord_cartesian(xlim = c(-0.5, 1)) +
   labs(title = glue("Power (\u03B1 = {ALPHA}) vs. true ATE"))
-ggsave("writeup/images/power_plot.png", width=200, height=150, units="mm")
+# ggsave("writeup/images/power_plot.png", width=200, height=150, units="mm")
 
 
 #####
@@ -77,7 +77,7 @@ ggplot( circ20, aes( x=tau, y=power, col=ICC, group=interaction(n_bar, ICC) ) ) 
   facet_grid(~n_bar, labeller=label_both) +
   labs( title = glue("Power (\u03B1 = {ALPHA}) to detect a site with ATE=0.2"), 
         x = "tau" )
-ggsave("writeup/images/power_plot_ATE02.png", width=200, height=75, units="mm")
+# ggsave("writeup/images/power_plot_ATE02.png", width=200, height=75, units="mm")
 
 
 # for sites with ATE=0.2, plot estimated ATEs (across sim settings)
@@ -90,7 +90,7 @@ hits2 %>%
   geom_vline( xintercept = 0.2, col="red" ) +
   facet_grid( ICC ~ n_bar, labeller = label_both ) +
   labs(title = "Estimated ATEs for sites with ATE=0.2")
-ggsave("writeup/images/power_plot_ATE02_dens.png", width=200, height=150, units="mm")
+# ggsave("writeup/images/power_plot_ATE02_dens.png", width=200, height=150, units="mm")
 
 
 
@@ -104,22 +104,23 @@ agg_hits =  hits %>%
              power_single = mean(pvalue_single <= ALPHA) )
 
 # power vs. ATE, comparing multi-site to single-site
+power_single_key <- agg_hits %>%
+  group_by(n_bar, J, ICC, ATE) %>%
+  summarize(power_single = mean(power_single))
+
 agg_hits %>%
-  pivot_longer(cols = c(power, power_single),
-               names_to = "estimator",
-               values_to = "power") %>%
-  mutate(estimator = ifelse(estimator == "power", "MLM", "single-site")) %>%
-  ggplot(aes(x=ATE, y=power, group=interaction(estimator, tau), color=tau)) +
-  # geom_point() +
-  geom_line(aes(lty=estimator)) +
+  ggplot(aes(x=ATE)) +
+  geom_line(data = power_single_key, aes(y=power_single)) +
+  geom_line(aes(y=power, group=tau, color=tau)) +
   facet_grid(ICC ~ n_bar, labeller = label_both) +
   coord_cartesian(xlim = c(-0.5, 1)) +
   geom_hline(aes(yintercept=0.8), lty="dashed") +
   geom_hline(aes(yintercept=ALPHA), lty="dashed") +
   geom_vline(aes(xintercept=0)) +
   labs(title = glue("Power (\u03B1 = {ALPHA}) vs. true ATE"),
-       subtitle = "(comparison of MLM and single-site estimates)")
-ggsave("writeup/images/power_plot_comp.png", width=200, height=150, units="mm")
+       subtitle = "Black line = single-site estimates")
+
+# ggsave("writeup/images/power_plot_comp.png", width=200, height=150, units="mm")
 
 
 # # bar chart of reject/no-reject for each site
@@ -158,15 +159,25 @@ circ20 %>%
   pivot_longer(cols = c(power, power_single),
                names_to = "estimator",
                values_to = "power") %>%
-  mutate(estimator = ifelse(estimator == "power", "MLM", "single-site")) %>%
-ggplot( aes( x=tau, y=power, col=ICC, group=interaction(n_bar, ICC, estimator) ) ) +
-  geom_point() +
-  geom_line(aes(lty = estimator)) +
+  mutate(estimator = ifelse(estimator == "power", "MLM", "single-site"))
+
+power_single_key20 <- circ20 %>%
+  group_by(n_bar, J, ICC) %>%
+  summarize(power_single = mean(power_single))
+
+circ20 %>%
+ggplot( aes( col=ICC, group=interaction(n_bar, ICC) ) ) +
+  geom_point(aes(x=tau, y=power)) +
+  geom_line(aes(x=tau, y=power)) +
+  geom_segment(data = power_single_key20, 
+               aes(y=power_single, yend=power_single, x=1, xend=4),
+               lty = "dashed") +
   geom_hline(yintercept=0.8, lty="dashed") +
   facet_grid(~n_bar, labeller=label_both) +
-  labs( title = glue("Power (\u03B1 = {ALPHA}) to detect a site with ATE=0.2"), 
+  labs( title = glue("Power (\u03B1 = {ALPHA}) to detect a site with ATE=0.2"),
+        subtitle = "Solid lines = MLMs, dashed lines = single-site",
         x = "tau" )
-ggsave("writeup/images/power_plot_comp_ATE02.png", width=200, height=75, units="mm")
+# ggsave("writeup/images/power_plot_comp_ATE02.png", width=200, height=75, units="mm")
 
 
 # for sites with ATE=0.2, plot estimated ATEs (across sim settings)
@@ -183,5 +194,5 @@ hits %>%
   geom_vline( xintercept = 0.2, col="red" ) +
   labs(title = "Estimated ATEs for sites with ATE=0.2",
        subtitle = "(ICC = 0)")
-ggsave("writeup/images/power_plot_comp_ATE02_dens.png", width=200, height=150, units="mm")
+# ggsave("writeup/images/power_plot_comp_ATE02_dens.png", width=200, height=150, units="mm")
 
