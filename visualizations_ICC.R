@@ -196,3 +196,30 @@ hits %>%
        subtitle = "(ICC = 0)")
 # ggsave("writeup/images/power_plot_comp_ATE02_dens.png", width=200, height=150, units="mm")
 
+
+
+#####
+# RMSE plots
+#####
+
+# 
+hits %>%
+  group_by(n_bar, J, ICC, tau, tx_var, runID) %>%
+  summarize(rmse = sqrt(mean((ATE - ATE_hat)^2)),
+            rmse_single = sqrt(mean((ATE - ATE_hat_single)^2))) %>%
+  ggplot(aes(x=rmse, y=rmse_single, col=ICC)) +
+  geom_point() +
+  facet_grid(tau ~ n_bar) +
+  geom_abline()
+
+# RMSE for tau_j=0.2 sites, across sims
+hits %>%
+  filter(ATE == 0.2) %>%
+  group_by(n_bar, J, ICC, tau, tx_var) %>%
+  summarize(rmse = sqrt(mean((ATE - ATE_hat)^2)),
+            rmse_single = sqrt(mean((ATE - ATE_hat_single)^2))) %>%
+  ggplot(aes(x=rmse, y=rmse_single, col=ICC)) +
+  geom_point() +
+  facet_grid(~ n_bar) +
+  geom_abline()
+

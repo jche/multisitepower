@@ -265,6 +265,8 @@ When the overall site average is low, however, they have reasonable type-I error
 
 \cmntC{Idea: when $\tau_j$ is higher, it's more likely to come from a simulation where $\bar{\tau}$ is higher, which means upward shrinkage and higher power! This is super annoying. Perhaps doing `set site simulation' will be necessary...}
 
+\cmntC{I ran a quick check, and higher $\tau_j$ values do indeed tend to come from simulations with higher averages of all of the $\tau_j$ values...}
+
 The dashed horizontal lines on Figure~\ref{fig:power_plot_ATE02} for the $\tau_j = 0.20$ sites show a similar pattern, with the divergence of power increasing as the true average increases, and the divergence increasing more quickly in the low information settings.
 
 Figure~\ref{fig:power_plot_comp_ATE02_dens} compares the single-site estimates and MLM estimates for a $\tau_j=0.20$ site across our $ICC = 0$ scenarios.
@@ -274,7 +276,7 @@ Overall, the MLM model is improving the estimation in terms of how far off the e
 
 \cmntM{Perhaps a plot with the RMSE to make this point more forcefully?  In this case, also calculate the RMSE of using the simple estimate average impact for all sites for the site of interest.}
 
-
+\cmntC{RMSE for sites with $\tau_j = 0.2$ is indeed better using the MLMs, more so in the low-information setting.}
 
 \subsubsection{Discussion}
 Overall, MLM shrinkage increases rejection rates, relative to our baseline, when $\tau$ is high and site information is low, which increases both the power and the type-I error rate (type-I error is the rejection rate when the true site impact ($x$-axis) is 0.
