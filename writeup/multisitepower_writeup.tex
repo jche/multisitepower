@@ -5,6 +5,9 @@
 \usepackage{amsthm}
 \usepackage{bm}
 
+% for coloring in a table
+%\usepackage[table,xcdraw]{xcolor}
+
 % including graphics
 \usepackage{graphicx}
 \graphicspath{ {./images/} }
@@ -15,6 +18,9 @@
 \usetikzlibrary{shapes.geometric, arrows}
 \tikzstyle{startstop} = [rectangle, rounded corners, minimum width=3cm, minimum height=1cm,text centered, draw=black, fill=red!10]
 \tikzstyle{arrow} = [thick,->,>=stealth]
+
+% hyperlinks
+\usepackage{hyperref}
 
 % some useful shortcuts
 \DeclareMathOperator*{\argmax}{argmax}
@@ -43,7 +49,7 @@
 \author{Jonathan Che \& Luke Miratrix}
 
 \begin{document}
-	
+
 \maketitle
 
 %\begin{abstract}
@@ -52,36 +58,47 @@
 
 \section{Introduction}
 
-The usual question for a multisite trial, those randomized trials where each of a set of sites has individuals randomized into treatment and control, is whether the treatment worked \emph{on average overall}.
-Even this question has its wrinkles, if we believe the site-level average effects differ.
-For example, do we estimate the average impact for all individuals across all sites, or instead estimate the simple site average of their average impacts?
-Regardless, when designing a multisite experiment there are power analysis tools designed to ensure a given design will achieve desired levels of power for these average effects.
+The usual question for multisite trials\textemdash randomized trials where each of a set of sites has individuals randomized into treatment and control\textemdash is whether the treatment worked \emph{on average overall}.\footnote{Though seemingly simple, even this question has its wrinkles if we believe the site-level average effects differ.
+For example, do we estimate the average impact for all individuals across all sites, or instead estimate the simple site average of their average impacts?}
+When designing a multisite experiment there are power analysis tools designed to ensure a given design will achieve desired levels of power for this average effect.
 There are even power formulas designed to ensure one can detect a given level of cross-site impact variation, if that is a quantity of interest.
 
 But what if we are interested in the individual sites?
-Typically, in a multisite experiment no individual site will be large enough to be well-powered, on its own, for detecting whether that site was actually effective.
-This is, after all, why we frequently turn to multisite experiments: we seek to increase our overall power by averaging across a suite of underpowered, local, investigations.
+Typically, in a multisite experiment no individual site will be large enough to be well-powered, on its own, for detecting whether treatment at that site was actually effective.
+This is, after all, why we frequently turn to multisite experiments: we seek to increase our overall power by averaging across a collection of underpowered, local, investigations.
 That being said, the stakeholders at these local investigations will frequently want to know not whether the experiment worked overall, but whether it worked for them.
 As researchers, we might also want to identify which sites are most likely to be the drivers of an overall effect.
 
-An approach to answering, at least approximately, these individual-site focused questions is to use multilevel modeling, or hierarchical Bayesian modeling, to partially pool the individual site effects.
-We hope to ``borrow strength'' from the other sites, making the assumption that the sites are related and thus their true impacts are likely more similar than what we see given the overall uncertainty.
-This process results in point estimates, with nominal uncertainty measures, for each of the individual sites that are shrunken towards the overall average estimated effect.
-These shrunken estimates and corresponding intervals will be biased, meaning they will not necessarily have good control over error rates.
-But they might be better than nothing.
+We can get an approximate answer to these questions about individual sites by using multilevel or hierarchical Bayesian models to partially pool the individual site effects.
+For each site, these models ``borrow strength'' from the other sites under the assumption that the sites are related.
+This process results in point estimates for each of the individual sites that are shrunken towards the overall average estimated effect.
 
-While there is an extensive literature on power analyses for the overall average treatment effect and cross-site variation in multisite trials (e.g., Raudenbush \& Liu 2000, many others...), less attention has been paid to inferences for these individual estimates.
-Particularly, how to calculate the power to detect a hypothesized effect for a specific site in a particular study design is not entirely clear.
-In this paper we explore using multilevel and Bayesian modeling to report on individual site impacts.
-We first review how one might model and report such effects.
+The construction of confidence intervals around these shrunken estimates requires some nuance.
+In general, confidence intervals for individual site effects in a hierarchical model are actually ill-defined under a frequentist framework.\footnote{Under a frequentist framework, the individual site effects $\tau_j$ are random effects, and not parameters of interest.
+Just as it makes little sense to define confidence intervals for regression residuals, it makes little sense to define confidence intervals for these random effects.
+(To be honest, I'm not positive about this intuition.
+Section 1.2 of  \href{https://core.ac.uk/download/pdf/38903061.pdf}{this paper} describes frequentist inference for random effects, though it mentions that it's quite messy.
+On the other hand, the internet (e.g., \href{https://stat.ethz.ch/pipermail/r-sig-mixed-models/2011q3/014077.html}{here} or \href{https://github.com/lme4/lme4/issues/497}{here}) suggests that people don't really do frequentist inference on the random effects.) }
+We can, however, construct credible intervals under a Bayesian framework that can provide similar information about the uncertainty in site effects.
+There is an extensive literature concerning the construction of appropriate intervals for individual site effects under shrinkage (see Casella and Hwang (2012) for a thorough review; see He (1992), Hwang et al. (2009), and Armstrong et al. (2021) for relevant examples of these methods).
+
+Unfortunately, these credible intervals do not satisfy the frequentist definition of $\alpha$-level converage for the $\tau_j$ values; instead, they satisfy so-called Empirical Bayes (EB) coverage, which integrates the coverage probability over both the data and the parameters (Morris 1983).\footnote{Recall that frequentist coverage is defined as the probability that a random interval contains a fixed parameter $\theta$, where randomness is integrated over the distribution of the observed data.
+EB coverage additionally integrates out the parameter $\theta$ over its prior distribution.}
+This means that they only provide guarantees for \textit{average} coverage across sites, and not for coverage for any particular site.
+Given the inherent bias in shrunken point estimates, we might be concerned that, e.g., only examining average coverage could mask systematic undercoverage for extreme sites.
+Overall, the question of inference for particular site effects in multilevel models appears to remain fairly open (Armstrong et al (2021) cites Hansen (2006) for this), with limited guidance about best practices.
+
+In this study, we focus on frequentist-style power analyses for detecting a hypothesized effect for a specific site in a particular study design.\footnote{I.e., we are interested in coverage for each particular $\tau_j$, and not in average coverage across the collection of $\tau_j$ values in a multisite trial.}
+While there is an extensive literature on these types of power analyses for the overall average treatment effect and cross-site variation in multisite trials (e.g., Raudenbush \& Liu 2000, many others...), less attention has been paid to similar power analyses for individual site effect estimates.
+We first review how one might use multilevel and Bayesian models to report such effects.
 We then propose simulation-based tools to do power calculations.
-We then conduct a simulation study to examine individual level power for site-level treatment effects in multisite trials.
+Finally, we conduct a simulation study to examine power for site-level treatment effects in multisite trials.
 At this point, we also examine how poorly these individual level estimates perform in practice, and provide guidance on the overall business of individual site estimation in the context of multisite trials.
 
 
 \section{Detecting individual site effects}
 
-Assume a model for individuals $i$ in sites $j$, where we fix  $Var(Y(0)) = 1$ (to be in effect size units), of 
+Assume a model for individuals $i$ in sites $j$ of: 
 \begin{align*}
 	Y_{ij} &= \alpha_j + \tau_j Z_{ij} + \epsilon_{ij} \\
 	\alpha_j &= \alpha + u_{0j} \\
@@ -95,43 +112,51 @@ Assume a model for individuals $i$ in sites $j$, where we fix  $Var(Y(0)) = 1$ (
 	\begin{bmatrix}
 		ICC & \rho \\ \rho & \omega
 	\end{bmatrix}\right) \\
-	\epsilon_{ij} &\sim N(0, 1-ICC) ,
+	\epsilon_{ij} &\sim N(0, \sigma^2) ,
 \end{align*}
 where $Z_{ij}$ are the individual treatment indicators, $\tau$ is the overall site-average treatment impact, and $\omega$ is the amount of cross site variation.
 The $u_{0j}$ are the random intercepts for the sites, and the $u_{1j}$ are how the sites vary from each other in terms of average treatment impact.
+We fix  $Var(Y_{ij}(0)) = Var(\alpha_j) + Var(\epsilon_{ij}) = 1$ to be in effect size units.
 
-The effect size scaling gives the variance of our random intercepts in terms of the Intra Class Correlation Coefficient (ICC) of
-$$ ICC = \frac{Var(\alpha_i)}{Var(\alpha_i) + Var(\epsilon_{ij})} = Var(\alpha_i) .$$
-This also dictates that our within-site residual variation $\sigma^2$ is $1-ICC$.
-We ignore additional covariate adjustment for the moment for transparency.
+The effect size scaling gives the variance of our random intercepts in terms of the Intra Class Correlation Coefficient (ICC) of:
+$$ ICC = \frac{Var(\alpha_i)}{Var(\alpha_j) + Var(\epsilon_{ij})} = Var(\alpha_j).$$
+This also dictates that our within-site residual variation $\sigma^2$ equals $1-ICC$.
+We ignore additional covariate adjustment for the moment for clarity.
 
 The simplest, completely unpooled test of whether an individual site had a positive effect would be to drop the rest of the data and test the difference in means of the treatment and control groups at that site.
-The power to detect effects locally in this manner is purely a function of the site sample size, site variation, and the size of the true average impact.
-The standard error for Site $j$'s impact estimate would then be
+The power to detect effects locally in this manner is purely a function of the site sample size, variation in outcomes within the site, and the size of the true site average impact.
+The standard error for site $j$'s impact estimate would then be
 $$ SE_j = \left[ \frac{1}{n_j} \frac{1}{(1-p_j)p_j} (1-ICC) \right]^{1/2} , $$ 
 where $p_j$ is the proportion treated at site $j$.
 
-For testing, we would estimate $\hat{\tau}_j$ and $\widehat{SE}_j$, the latter with a plug-in estimate of $\hat{\sigma}_j$.
+For testing, we would estimate $\hat{\tau}_j$ and $\widehat{SE}_j$, the latter with a plug-in estimate of $\hat{\sigma}_j$.\footnote{For two examples, we could estimate $\hat{\sigma}_j$ with an interacted linear regression where we completely pool our residual variation across sites, or simply estimate the within-group variation at site $j$.
+The former would help stabilize, under homoscedasticity, our residual estimate which could be helpful in very small sample contexts.}
 We obtain $p$-values using $t = \hat{\tau}_j / \widehat{SE}_j$, referenced to a $t$ distribution with many degrees of freedom, assuming the site is not tiny.
-(We could estimate $\hat{\sigma}_j$ (the $1 - ICC$ term) with an interacted linear regression where we completely pool our residual variation across sites, or simply estimate the within-group variation at site $j$. The former would help stabilize, under homoscedasticity, our residual estimate which could be helpful in very small sample contexts.)
 
 A multisite analysis does none of this, of course.
-Instead, with a multilevel model, we initially estimate the overall parameters, including $\omega$, the degree of cross site variation, and none of the individual site average impacts.
-We then, in a second step, effectively shrink all the raw $\hat{\tau}_j$ towards the overall estimate of $\hat{\tau}$, shrinking more the lower our estimate of $\omega$ is.
-These $\tilde{\tau}_j$ are the Empirical Bayes estimates for the individual site impacts; while biased, they are known to be better predictors of the full collection of true site-level impacts than the raw estimates, above.
+Instead, with a multilevel model, we initially estimate the overall parameters, including the degree of cross site variation $\omega$, and none of the individual site average impacts.
+We then, in a second step, effectively shrink all the raw $\hat{\tau}_j$ towards the overall estimate of $\hat{\tau}$ to get $\tilde{\tau}_j$, shrinking more the lower our estimate of $\omega$ is.
+These $\tilde{\tau}_j$ are the Empirical Bayes estimates for the individual site impacts; while biased, they are known to be better point estimates (in terms of MSE) for the full collection of true site-level impacts than the raw estimates $\hat{\tau}_j$.
 
 We can also obtain (poorly performing) standard error estimates $\tilde{SE}_j$ for our $\tilde{\tau}_j$ as well.
 Using the estimate and standard error, we can finally conduct hypothesis testing as before, taking the test statistic of $t = \tilde{\tau}_j / \tilde{SE}_j$ as standard normal statistic and calculating a $p$-value as usual.
-These tests will not, however, have the usual guarantees on error rate control.
+These tests will not, however, have the usual guarantees on Type-I error rate control.
 That being said, they may perform decently well in practice.
 
 Without shrinkage, power is simply a function of the un-shrunk standard error $SE_j$ and the true average effect $\tau_j$ for site $j$.
-Given the shrinkage, the power to detect an individual site effect will additionally depend on the  the general size and distribution of average effects at other sites.
+Given the shrinkage, the power to detect an individual site effect will additionally depend on the general size and distribution of average effects at other sites.
 Of course, the most relevant parameter will be the site's average effect, but the distribution of impacts estimated at the other sites will affect how each site estimate is shrunk towards the overall average impact.
 The question is how much this shrinkage helps or hurts the power and validity of the testing procedure, especially for those sites that actually have impacts far from the overall average.
 
 
 \section{A simulation-based power calculator}
+
+WRITE:
+
+In the context of multilevel models, we need to specify a site and a context...
+
+
+
 
 To assess power for a hypothesized individual site, we need to specify the site we are estimating power for, as power for a site depends primarily on the true impact for the site.
 In the multilevel modeling case, we also need to specify the \emph{context} that the site is in, as the overall context will also affect our individual estimate and uncertainty estimate.

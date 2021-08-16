@@ -38,6 +38,7 @@ vignettes/*.pdf
 # Temporary latex files
 *.log
 *.aux
+*.out
 *.synctex.gz
 
 *.pdf
