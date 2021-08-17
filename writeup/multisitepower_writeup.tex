@@ -151,53 +151,72 @@ The question is how much this shrinkage helps or hurts the power and validity of
 
 \section{A simulation-based power calculator}
 
-WRITE:
+To calculate power for a multisite trial, we need to specify parameters for both the individual site of interest and its context.
+While a typical power analysis for a single site only requires specification of a single hypothesized effect size (along with significance and power requirements), in a multisite trial the site's context, i.e., the number, size, and distribution of other sites, will also affect the effect estimate for that site.
+The question is then: for a given site of interest, within a given context of interest, what is the chance of rejecting the null of no effect for that site?
 
-In the context of multilevel models, we need to specify a site and a context...
-
-
-
-
-To assess power for a hypothesized individual site, we need to specify the site we are estimating power for, as power for a site depends primarily on the true impact for the site.
-In the multilevel modeling case, we also need to specify the \emph{context} that the site is in, as the overall context will also affect our individual estimate and uncertainty estimate.
-I.e., overall we will need to specify the characteristics, including the individual true site impact, for a target site, and then also specify the number of additional sites, the distribution of site effects, and so forth, that our target site resides in.
-We can then ask, for the given site of interest, for the context of interest, what is the chance of rejecting the null of no effect for that site?
-We do this via simulation: we repeatedly generate our target site and the associated context, analyze the synthetic data, and record whether we have detected an effect.
-The frequency we reject the null across our simulations is the power for that site and context.
+We answer this question via simulation.
+We repeatedly generate our target site and an associated context, analyze the synthetic data, and record whether we have detected an effect.
+The frequency with which we reject the null across our simulations is then the power for that site and context.
 We propose two general tools for conducting such a simulation.
 
+\paragraph{Set-site simulation.} A straightforward way to conduct a multisite power simulation is to specify the site, and then to separately specify the sites in its context.
+This completely decouples the site from its context.
+For example, we could set the value of the true effect for site 1 to be $\tau_1 = 7$, and then sample the true effects for the $J-1$ other sites as $\tau_2, \dots, \tau_J \sim N(\tau, \omega)$.
+For each set value of $\tau_1$, we could repeatedly generate data from a context to determine the power for that site/context combination.
 
-\paragraph{Set site simulation.} A straightforward way of doing this is to specify the site, and then separately specify the distribution of sites in the context.
-This decouples the site from context: we could in principle ask the chance of noticing a large impact in a context where all the rest of the sites have no impact.
-This does mean the overall true treatment effect for our simulated samples will be a weighted average between our fixed site effect and the mix of additional sites generated.
-That being said, the set site approach allows for a straightforward specification of these two components.
+This simulation strategy has two unusual features.
+First, the full collection of sites 1 through $J$ no longer matches any data-generating model, because the site of interest is manually specified, unlike its context, which is still randomly generated according to particular parameters.
+Second, for a fixed context, changing the site effect of interest naturally changes features of the full dataset on which the model is fit.
+For example, if we fix the context as $\tau_2, \dots, \tau_J \sim N(\tau, \omega)$, setting $\tau_1 = -10$ versus $\tau_1 = 10$ will change $\bar{\tau} = \frac{1}{J} \sum_{j=1}^{J} \tau_j$, so even though the context remains the same, the direction in which the model shrinks its effect estimates can change.
+We therefore need to be careful when interpreting comparisons across different $\tau_0$ values given a particular context.
+That being said, the set site approach provides a clean answer to the question: if my site of interest is as specified, and it is otherwise within a particular context, what is the chance that I detect an effect for it?
 
-\paragraph{All site simulation.} For power calculations, we often want an entire power curve, where we can see the power to detect a range of possible impact sizes.
-We can generate such a curve in a single step by repeatedly generating full multisite datasets, testing all the sites, and then grouping sites with the same true average impact across all the simulation runs.
-I.e., if we identify all sites with a given true effect across all runs, we can estimate power for that effect size by calculating the rejection rate across the identified set.
-Of course, given the continuous nature of random impact estimate, sites will never have the exact same value.
+\paragraph{Choose-site simulation.} Another way to conduct a multisite power simulation is to first specify and simulate all $J$ sites, and to then choose a particular site within the context as the ``site of interest'' (and treating the remaining $J-1$ sites as its ``context'').
+This can be done for each of the generated sites in every simulation.
+If we repeatedly do this, we can get power curves by grouping together sites that happen to have the same true impacts and seeing how often we reject the null for them.\footnote{Of course, given the continuous nature of the random site effects $\tau_j$, sites will never have the exact same true effect.
 We therefore round the randomly generated $\tau_j$ to the nearest 0.05 before generating the individual responses within sites.
+Alternatively, we could, e.g., repeatedly simulate data from a context where $\tau_j \sim N(0, 1)$, and summarize the power for all sites for which the true $\tau_j \in [0.95, 1.05]$ to estimate  power for sites with $\tau_j$ ``near'' 1, repeating this for $\tau_j$ values ``near'' as many other values as we'd like.}
 
-This approach has a few small caveats: first, we will only obtain power estimates for impact sizes that are in the range we might naturally see given the overall specification of average impact and cross-site variation.
-This seems a reasonable limitation, in general, as we want our individual specification to align with the global one.
+This approach, however, has an undesirable feature.
+Suppose we want to know the power for a site with $\tau_j = 1$ in the context $N(\tau, \omega)$.
+When computing this power, we would systematically exclude all sites with $\tau_j = 1$ from the context; in other words, our true context would be $N(\tau, \omega \mid \tau_j \neq 1)$, the usual context with a gap at the specified $\tau_j$ value.
+Besides making things difficult to interpret, this phenomenon also makes it hard to compare results across different $\tau_j$ values, since the context always changes.
+As such, we opt to not follow this simulation strategy.
 
-There is also a slight ``double-booking'' effect in the joint simulation, especially for impact sizes that are much higher or lower than the overall average.
-In these cases,  most sites with impacts of a specified unusual size across our simulation runs will be in contexts where the overall average is also more unusual (far from the target $\tau$) because the individual site is part of the overall average.
-This bias will be more pronounced with fewer sites, as the individual site will play a larger role.
-This double-booking is explicitly being done in the set site simulation approach.
-Here it is happening partially, and organically.
-\cmntC{This is a good point -- e.g., for a very low treatment effect, the ATE will be slightly lower than usual, so shrinkage will be slightly less than usual.
-Perhaps this means that `set site simulation' is the cleaner way to proceed}
+\paragraph{All-site simulation} One final way to conduct a multisite power simulation is to use choose-site simulation, but to treat the full collection of $J$ sites as the ``context'' for each site of interest instead of only considering the $J-1$ other sites as the context.
+This approach circumvents the previous complications regarding the data-generating distribution; data are generated exactly according to the theoretical model, and there are no gaps or additions caused by removing or adding $\tau_j$ values for the site of interest.
 
+All-site simulation, however, still runs into similar complications as set-site simulation.
+For a given context $G(\cdot)$, there is natural variation between simulations of $\tau_1, \dots, \tau_J \sim G(\cdot)$; in particular, some simulations will have higher true $\bar{\tau} = \frac{1}{J} \sum_{j=1}^J \tau_j$ values and others will have lower $\bar{\tau}$ values, simply due to random chance, especially if $J$ is small.
+When we summarize the results for higher values of $\tau_j$ across simulation runs of the same theoretical context $G(\cdot)$, we notice that those higher-$\tau_j$-value sites come from simulated contexts with higher $\bar{\tau}$ values, on average.
+In other words, because we include the sites of interest within their ``contexts,'' sites of interest with higher $\tau_j$ values will naturally have contexts with higher $\bar{\tau}$ values.
+Given a fixed context $G(\cdot)$, this makes comparison across different $\tau_j$ values for the site of interest quite challenging, because the higher $\tau_j$ values will end up averaging across simulations with higher $\bar{\tau}$ values.
+Another minor challenge with the all-site approach is that we cannot directly specify the $\tau_j$ values of our sites of interest, which means that the range of possible $\tau_j$ values (and how often extreme $\tau_j$ values appear) is constrained by our context.
 
+As a result, all-site simulation answers a slightly different question than does set-site simulation: if I have a particular context and am interested in a site that happens to have a particular true effect within that context, what is the chance that I detect an effect for it?
+This question allows for the fact that, e.g., having a large $\tau_j$ value for the site of interest will affect the model's estimates, even if we control for the context.
+
+\paragraph{Summary of possible strategies} The three possible strategies for generating full collection of true site effects are summarized below:
+\begin{itemize}
+	\item Set $\tau_1$ to a given value, and generate $\tau_2, \dots, \tau_J \sim G(\cdot)$: set-site simulation
+	\item Generate $\tau_1, \dots, \tau_J \sim G(\cdot)$, and then:
+	\begin{itemize}
+		\item For each site $j$, treat the $J-1$ other sites as the context: choose-site simulation
+		\item For each site $j$, treat the full collection of $J$ sites as the context: all-site simulation
+	\end{itemize}
+\end{itemize}
+
+For now, we have generated some results under all-site simulation.
+If desired, we can reproduce the results under set-site simulation, if that feels easier to interpret.
+
+\section{Simulation}
+To understand how multilevel modeling potentially helps power and also undermines control of error rates, we conducted a multifactor simulation across a range of scenarios.
 
 \paragraph{Conducting the simulation.}
 To generate multisite data, we use the \texttt{blkvar} package in R; this package provides a host of methods for generating multisite data and analyzing it with a variety of models.
 We first generate our collection of sites, then round site impacts to the nearest 0.05, and then generate the individuals within the site.
 We finally take the generated data and analyze it with whatever planned analytic approach we have decided on.
-
-\section{Simulation}
-To understand how multilevel modeling potentially helps power and also undermines control of error rates, we conducted a multifactor simulation across a range of  scenarios.
 
 %The parameters we vary are:
 %\begin{itemize}
