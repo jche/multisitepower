@@ -6,7 +6,7 @@
 # uses blkvar package: devtools::install_github("https://github.com/lmiratrix/blkvar")
 #####
 
-library( arm )   # note: loads MASS package
+library( arm )   # bayesian-type functions for lmer, note this loads MASS package
 # devtools::install_github("lmiratrix/blkvar")
 library( blkvar )
 
@@ -44,8 +44,6 @@ run_t_test <- function(df) {
 #'
 #' @examples
 one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
-  
-  # browser()
   
   sdat = blkvar::generate_multilevel_data( n.bar=n, J=J,
                                            variable.n = FALSE,
@@ -102,12 +100,23 @@ one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
   # Currently: RIRC model (so no site-by-treatment interactions)
   mod = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )
   
-  res = as.data.frame( coef( mod )$sid )     # random effects
-  ses = as.data.frame( se.ranef(mod)$sid )   # standard errors
+  res = as.data.frame( coef( mod )$sid )       # point estimates of fixed effect + random effects
+  ses_rand = as.data.frame( se.coef(mod)$sid ) # standard errors of random effect for Z
+  se_fixed <- se.coef(mod)$fixef[2]            # standard error of fixed effect for Z
+  ses <- ses_rand %>%
+    mutate(Z_fixed = se_fixed,
+           Z_rand = Z,
+           Z = sqrt(Z^2 + se_fixed^2))
+  
+  # ISSUE: using sqrt(se(RE for Z)^2 + se(FE for Z)^2) doesn't get us correct EB coverage
+  #  - should it? unclear.
+  browser()
   
   res = tibble( sid = rownames( ranef( mod )$sid ),
                 est = res$Z,
                 SE = ses$Z,
+                SE_fixed = ses$Z_fixed,
+                SE_rand = ses$Z_rand,
                 t = est / SE,
                 pvalue_one = pnorm(-t))
   
@@ -122,8 +131,8 @@ one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
 }
 
 
-if ( F ) {
-  os <- one_sim( n=200, J=200, tau=0.2, ICC=0.3, tx_var=0.3)
+if ( T ) {
+  os <- one_sim( n=500, J=20, tau=0.2, ICC=0.9, tx_var=0.3)
   mean( os$ATE )
   mean( os$ATE_hat )
   ggplot( os, aes( ATE, ATE_hat ) ) +
@@ -163,7 +172,7 @@ df_sim <- expand_grid(
 tic()
 df_sim <- df_sim %>%
   rowwise() %>%
-  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 1)))
+  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 250)))
 toc()
 
 # raw results: unnest df_sim & record pvalue_one per site
@@ -176,7 +185,7 @@ hits = df_sim %>%
 # save results
 #####
 
-FNAME <- "sim_results_txvar03"
+FNAME <- "sim_results_fixed"
 fname <- glue("results/", FNAME, ".csv")
 
 if (file.exists(fname)) {
