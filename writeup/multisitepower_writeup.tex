@@ -58,7 +58,7 @@
 
 \section{Introduction}
 
-The usual question for multisite trials\textemdash randomized trials where each of a set of sites has individuals randomized into treatment and control\textemdash is whether the treatment worked \emph{on average overall}.\footnote{Though seemingly simple, even this question has its wrinkles if we believe the site-level average effects differ.
+The usual question for multisite trials\textemdash randomized trials where each of a set of sites has individuals randomized into treatment and control\textemdash is whether the treatment worked \emph{on average overall}, even though the treatment may have different effects across sites.\footnote{Though seemingly simple, even this question has its wrinkles if we believe the site-level average effects differ.
 For example, do we estimate the average impact for all individuals across all sites, or instead estimate the simple site average of their average impacts?}
 When designing a multisite experiment there are power analysis tools designed to ensure a given design will achieve desired levels of power for this average effect.
 There are even power formulas designed to ensure one can detect a given level of cross-site impact variation, if that is a quantity of interest.
@@ -74,7 +74,7 @@ For each site, these models ``borrow strength'' from the other sites under the a
 This process results in point estimates for each of the individual sites that are shrunken towards the overall average estimated effect.
 
 The construction of confidence intervals around these shrunken estimates requires some nuance.
-In general, confidence intervals for individual site effects in a hierarchical model are actually ill-defined under a frequentist framework.\footnote{Under a frequentist framework, the individual site effects $\tau_j$ are random effects, and not parameters of interest.
+In general, confidence intervals for individual site effects in a hierarchical model are ill-defined under a frequentist framework.\footnote{Under a frequentist framework, the individual site effects $\tau_j$ are random effects, and not parameters of interest.
 Just as it makes little sense to define confidence intervals for regression residuals, it makes little sense to define confidence intervals for these random effects.
 (To be honest, I'm not positive about this intuition.
 Section 1.2 of  \href{https://core.ac.uk/download/pdf/38903061.pdf}{this paper} describes frequentist inference for random effects, though it mentions that it's quite messy.
@@ -83,17 +83,18 @@ We can, however, construct credible intervals under a Bayesian framework that ca
 There is an extensive literature concerning the construction of appropriate intervals for individual site effects under shrinkage (see Casella and Hwang (2012) for a thorough review; see He (1992), Hwang et al. (2009), and Armstrong et al. (2021) for relevant examples of these methods).
 
 Unfortunately, these credible intervals do not satisfy the frequentist definition of $\alpha$-level converage for the $\tau_j$ values; instead, they satisfy so-called Empirical Bayes (EB) coverage, which integrates the coverage probability over both the data and the parameters (Morris 1983).\footnote{Recall that frequentist coverage is defined as the probability that a random interval contains a fixed parameter $\theta$, where randomness is integrated over the distribution of the observed data.
-EB coverage additionally integrates out the parameter $\theta$ over its prior distribution.}
+	EB coverage additionally integrates out the parameter $\theta$ over its prior distribution.}
 This means that they only provide guarantees for \textit{average} coverage across sites, and not for coverage for any particular site.
-Given the inherent bias in shrunken point estimates, we might be concerned that, e.g., only examining average coverage could mask systematic undercoverage for extreme sites.
+These guarantees are not sufficient for stakeholders in multisite trials who are specifically interested in knowing whether the experiment worked for their site.
+For example, the inherent bias in shrunken point estimates raises concerns that only examining average coverage could mask systematic undercoverage for sites with extreme effects, which would be a problem for stakeholders at such sites.
 Overall, the question of inference for particular site effects in multilevel models appears to remain fairly open (Armstrong et al (2021) cites Hansen (2006) for this), with limited guidance about best practices.
 
-In this study, we focus on frequentist-style power analyses for detecting a hypothesized effect for a specific site in a particular study design.\footnote{I.e., we are interested in coverage for each particular $\tau_j$, and not in average coverage across the collection of $\tau_j$ values in a multisite trial.}
+In this study, we focus on frequentist-style conditional power analyses for detecting a hypothesized effect for a specific site in a particular study design.\footnote{I.e., we are interested in power/coverage, conditioned on given $\tau_j$ values, and not in average power/coverage across the collection of $\tau_j$ values in a multisite trial.}
 While there is an extensive literature on these types of power analyses for the overall average treatment effect and cross-site variation in multisite trials (e.g., Raudenbush \& Liu 2000, many others...), less attention has been paid to similar power analyses for individual site effect estimates.
 We first review how one might use multilevel and Bayesian models to report such effects.
 We then propose simulation-based tools to do power calculations.
 Finally, we conduct a simulation study to examine power for site-level treatment effects in multisite trials.
-At this point, we also examine how poorly these individual level estimates perform in practice, and provide guidance on the overall business of individual site estimation in the context of multisite trials.
+At this point, we also examine how poorly these site-level estimates perform in practice, and provide guidance on the overall business of individual site-effect estimation in the context of multisite trials.
 
 
 \section{Detecting individual site effects}
@@ -128,19 +129,20 @@ The power to detect effects locally in this manner is purely a function of the s
 The standard error for site $j$'s impact estimate would then be
 $$ SE_j = \left[ \frac{1}{n_j} \frac{1}{(1-p_j)p_j} (1-ICC) \right]^{1/2} , $$ 
 where $p_j$ is the proportion treated at site $j$.
-
 For testing, we would estimate $\hat{\tau}_j$ and $\widehat{SE}_j$, the latter with a plug-in estimate of $\hat{\sigma}_j$.\footnote{For two examples, we could estimate $\hat{\sigma}_j$ with an interacted linear regression where we completely pool our residual variation across sites, or simply estimate the within-group variation at site $j$.
 The former would help stabilize, under homoscedasticity, our residual estimate which could be helpful in very small sample contexts.}
-We obtain $p$-values using $t = \hat{\tau}_j / \widehat{SE}_j$, referenced to a $t$ distribution with many degrees of freedom, assuming the site is not tiny.
+We would finally obtain $p$-values using $t = \hat{\tau}_j / \widehat{SE}_j$, referenced to a $t$ distribution with many degrees of freedom, assuming the site is not tiny.
 
-A multisite analysis does none of this, of course.
-Instead, with a multilevel model, we initially estimate the overall parameters, including the degree of cross site variation $\omega$, and none of the individual site average impacts.
+A multisite analysis pools data across sites to try to improve effect estimates.
+With a multilevel model, we first estimate the overall parameters, including the degree of cross site variation $\omega$, and none of the individual site average impacts.
 We then, in a second step, effectively shrink all the raw $\hat{\tau}_j$ towards the overall estimate of $\hat{\tau}$ to get $\tilde{\tau}_j$, shrinking more the lower our estimate of $\omega$ is.
-These $\tilde{\tau}_j$ are the Empirical Bayes estimates for the individual site impacts; while biased, they are known to be better point estimates (in terms of MSE) for the full collection of true site-level impacts than the raw estimates $\hat{\tau}_j$.
+These $\tilde{\tau}_j$ are the Empirical Bayes estimates for the individual site impacts; while biased, they are known to be better point estimates (in terms of mean-squared error) for the full collection of true site-level impacts than the raw estimates $\hat{\tau}_j$.
 
-We can also obtain (poorly performing) standard error estimates $\tilde{SE}_j$ for our $\tilde{\tau}_j$ as well.
+Under a parametric or empirical Bayes framework, we can also obtain standard error estimates $\tilde{SE}_j$ for our $\tilde{\tau}_j$.
 Using the estimate and standard error, we can finally conduct hypothesis testing as before, taking the test statistic of $t = \tilde{\tau}_j / \tilde{SE}_j$ as standard normal statistic and calculating a $p$-value as usual.
-These tests will not, however, have the usual guarantees on Type-I error rate control.
+As discussed in the introduction, however, confidence intervals constructed using these standard errors do not satisfy frequentist coverage criteria, where, e.g., for a fixed $\tau_j$ the interval $(\tilde{\tau}_j \mp 1.96 \tilde{SE}_j)$ would cover $\tau_j$ 95\% of the time over repeated samples of the data.
+Instead, they satisfy EB coverage, where appropriate coverage holds over repeated samples of the data \textit{and} $\tau_j$ from the data-generating Normal model.
+In other words, hypothesis tests run in this way will not have the usual guarantees on Type-I error rate control for the site-specific effects.
 That being said, they may perform decently well in practice.
 
 Without shrinkage, power is simply a function of the un-shrunk standard error $SE_j$ and the true average effect $\tau_j$ for site $j$.
@@ -158,7 +160,7 @@ The question is then: for a given site of interest, within a given context of in
 We answer this question via simulation.
 We repeatedly generate our target site and an associated context, analyze the synthetic data, and record whether we have detected an effect.
 The frequency with which we reject the null across our simulations is then the power for that site and context.
-We propose two general tools for conducting such a simulation.
+We propose three general tools for conducting such a simulation.
 
 \paragraph{Set-site simulation.} A straightforward way to conduct a multisite power simulation is to specify the site, and then to separately specify the sites in its context.
 This completely decouples the site from its context.
@@ -172,27 +174,27 @@ For example, if we fix the context as $\tau_2, \dots, \tau_J \sim N(\tau, \omega
 We therefore need to be careful when interpreting comparisons across different $\tau_0$ values given a particular context.
 That being said, the set site approach provides a clean answer to the question: if my site of interest is as specified, and it is otherwise within a particular context, what is the chance that I detect an effect for it?
 
-\paragraph{Choose-site simulation.} Another way to conduct a multisite power simulation is to first specify and simulate all $J$ sites, and to then choose a particular site within the context as the ``site of interest'' (and treating the remaining $J-1$ sites as its ``context'').
+\paragraph{Remove-site simulation.} Another way to conduct a multisite power simulation is to first specify and simulate all $J$ sites, and to then choose a particular site as the ``site of interest'' and remove it from its ``context,'' which would consist of the remaining $J-1$ sites.
 This can be done for each of the generated sites in every simulation.
 If we repeatedly do this, we can get power curves by grouping together sites that happen to have the same true impacts and seeing how often we reject the null for them.\footnote{Of course, given the continuous nature of the random site effects $\tau_j$, sites will never have the exact same true effect.
-We therefore round the randomly generated $\tau_j$ to the nearest 0.05 before generating the individual responses within sites.
-Alternatively, we could, e.g., repeatedly simulate data from a context where $\tau_j \sim N(0, 1)$, and summarize the power for all sites for which the true $\tau_j \in [0.95, 1.05]$ to estimate  power for sites with $\tau_j$ ``near'' 1, repeating this for $\tau_j$ values ``near'' as many other values as we'd like.}
+	We therefore round the randomly generated $\tau_j$ to the nearest 0.05 before generating the individual responses within sites.
+	Alternatively, we could, e.g., repeatedly simulate data from a context where $\tau_j \sim N(0, 1)$, and summarize the power for all sites for which the true $\tau_j \in [0.95, 1.05]$ to estimate  power for sites with $\tau_j$ ``near'' 1, repeating this for $\tau_j$ values ``near'' as many other values as we'd like.}
 
 This approach, however, has an undesirable feature.
 Suppose we want to know the power for a site with $\tau_j = 1$ in the context $N(\tau, \omega)$.
 When computing this power, we would systematically exclude all sites with $\tau_j = 1$ from the context; in other words, our true context would be $N(\tau, \omega \mid \tau_j \neq 1)$, the usual context with a gap at the specified $\tau_j$ value.
 Besides making things difficult to interpret, this phenomenon also makes it hard to compare results across different $\tau_j$ values, since the context always changes.
-As such, we opt to not follow this simulation strategy.
+As such, we opt to not employ this simulation strategy.
 
-\paragraph{All-site simulation} One final way to conduct a multisite power simulation is to use choose-site simulation, but to treat the full collection of $J$ sites as the ``context'' for each site of interest instead of only considering the $J-1$ other sites as the context.
+\paragraph{All-site simulation} One final way to conduct a multisite power simulation is to use remove-site simulation, but to treat the full collection of $J$ sites as the ``context'' for each site of interest instead of only considering the $J-1$ other sites as the context.
 This approach circumvents the previous complications regarding the data-generating distribution; data are generated exactly according to the theoretical model, and there are no gaps or additions caused by removing or adding $\tau_j$ values for the site of interest.
 
 All-site simulation, however, still runs into similar complications as set-site simulation.
 For a given context $G(\cdot)$, there is natural variation between simulations of $\tau_1, \dots, \tau_J \sim G(\cdot)$; in particular, some simulations will have higher true $\bar{\tau} = \frac{1}{J} \sum_{j=1}^J \tau_j$ values and others will have lower $\bar{\tau}$ values, simply due to random chance, especially if $J$ is small.
 When we summarize the results for higher values of $\tau_j$ across simulation runs of the same theoretical context $G(\cdot)$, we notice that those higher-$\tau_j$-value sites come from simulated contexts with higher $\bar{\tau}$ values, on average.
 In other words, because we include the sites of interest within their ``contexts,'' sites of interest with higher $\tau_j$ values will naturally have contexts with higher $\bar{\tau}$ values.
-Given a fixed context $G(\cdot)$, this makes comparison across different $\tau_j$ values for the site of interest quite challenging, because the higher $\tau_j$ values will end up averaging across simulations with higher $\bar{\tau}$ values.
-Another minor challenge with the all-site approach is that we cannot directly specify the $\tau_j$ values of our sites of interest, which means that the range of possible $\tau_j$ values (and how often extreme $\tau_j$ values appear) is constrained by our context.
+Given a fixed context-generating distribution $G(\cdot)$, this makes comparison across different $\tau_j$ values for the site of interest quite challenging, because the higher $\tau_j$ values come from simulations with higher $\bar{\tau}$ values.
+Another minor challenge with the all-site approach is that we cannot directly specify the $\tau_j$ values of our sites of interest, which means that the range of possible $\tau_j$ values (and how frequently extreme $\tau_j$ values appear) is constrained by our context.
 
 As a result, all-site simulation answers a slightly different question than does set-site simulation: if I have a particular context and am interested in a site that happens to have a particular true effect within that context, what is the chance that I detect an effect for it?
 This question allows for the fact that, e.g., having a large $\tau_j$ value for the site of interest will affect the model's estimates, even if we control for the context.
@@ -202,13 +204,14 @@ This question allows for the fact that, e.g., having a large $\tau_j$ value for 
 	\item Set $\tau_1$ to a given value, and generate $\tau_2, \dots, \tau_J \sim G(\cdot)$: set-site simulation
 	\item Generate $\tau_1, \dots, \tau_J \sim G(\cdot)$, and then:
 	\begin{itemize}
-		\item For each site $j$, treat the $J-1$ other sites as the context: choose-site simulation
+		\item For each site $j$, treat the $J-1$ other sites as the context: remove-site simulation
 		\item For each site $j$, treat the full collection of $J$ sites as the context: all-site simulation
 	\end{itemize}
 \end{itemize}
 
 For now, we have generated some results under all-site simulation.
 If desired, we can reproduce the results under set-site simulation, if that feels easier to interpret.
+
 
 \section{Simulation}
 To understand how multilevel modeling potentially helps power and also undermines control of error rates, we conducted a multifactor simulation across a range of scenarios.
