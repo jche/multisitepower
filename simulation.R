@@ -9,6 +9,7 @@
 library( arm )   # bayesian-type functions for lmer, note this loads MASS package
 # devtools::install_github("lmiratrix/blkvar")
 library( blkvar )
+library(rstan)   # bayesian models!
 
 require(tidyverse)
 require(glue)
@@ -24,11 +25,29 @@ run_t_test <- function(df) {
   
   df %>%
     summarize(t = list(t.test(Y1[Z==1], Y0[Z==0], alternative = "greater"))) %>%
-    mutate(ATE_hat_single = t[[1]]$estimate["mean of x"] - t[[1]]$estimate["mean of y"],
-           SE_single = t[[1]]$stderr,
-           t_single = t[[1]]$statistic,
-           pvalue_single = t[[1]]$p.value) %>%
+    mutate(ATEhat_single = t[[1]]$estimate["mean of x"] - t[[1]]$estimate["mean of y"],
+           SE_single = t[[1]]$stderr
+           # t_single = t[[1]]$statistic,
+           # pvalue_single = t[[1]]$p.value
+           ) %>%
     select(-t)
+}
+
+# given the full df with individual observations,
+# make df with site-level summaries for rstan functions
+make_site_summaries <- function( df ) {
+  df %>%
+    group_by(sid, Z) %>%
+    summarize(ybar = mean(Yobs),
+              n = n(),
+              V = var(Yobs)) %>%
+    pivot_wider(names_from = "Z", 
+                values_from = ybar:V, 
+                names_sep = ".") %>%
+    ungroup() %>%
+    mutate(pool.se2 = sum( V.1 * (n.1-1) + V.0 * (n.0-1) ) / sum( n.1 + n.0 - 2 ),
+           tau.hat = ybar.1 - ybar.0,
+           SE = sqrt(pool.se2 / n.1 + pool.se2 / n.0))
 }
 
 # function: (# obs, effect size) => (reject null? T/F)
@@ -45,8 +64,11 @@ run_t_test <- function(df) {
 #' @examples
 one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
   
+  ##### simulate data #####
+  
   sdat = blkvar::generate_multilevel_data( n.bar=n, J=J,
-                                           variable.n = FALSE,
+                                           # variable.n = FALSE,
+                                           variable.n = TRUE,
                                            tau.11.star = tx_var,   # cross-site tx var
                                            gamma.10 = tau,      # cross-site ATE
                                            ICC = ICC,           # ICC [really var(intercepts)]
@@ -65,79 +87,124 @@ one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
   
   head(sdat)
   
-  
   # Note: generate_individual_data() is not in CRAN version of package
   # dat = blkvar::generate_individual_data( sdat )
   dat = generate_individual_data(sdat,
                                  sigma2.e = 1-ICC)   # need to specify this! or else sigma2.e = 1...
   head( dat )
   
-  # conclusion: "ICC" argument is just Var(\alpha_i), NOT the ICC itself!
-  if (FALSE) {
-    var(sdat$beta.0)
-    var(sdat$u0)   # what is u0? has to do with covariate, I think...?
-    
-    # cross-site variation: 1 for control group, 1.3 for treatment group
-    dat %>%
-      group_by(Z) %>%
-      summarize(var = var(Yobs))
-    
-    # within-site variation: always 1 if we don't specify sigma2.e in gen_indiv_data()
-    #  - 1-ICC if we correctly specify it!
-    dat %>%
-      group_by(Z, sid) %>%
-      summarize(var = var(Yobs)) %>%
-      summarize(mn_var = mean(var))
-  }
   
-  # run single-site models!
+  ##### run models #####
+  
+  ### run single-site models
+  
   res_single <- dat %>%
     group_by(sid) %>%
-    dplyr::group_modify(~run_t_test(.))
+    dplyr::group_modify(~run_t_test(.)) %>%
+    ungroup() %>%
+    mutate(sid = as.character(sid))
   
-  # Switch to FIRC model someday.
-  # Or our bayesian modeling to get posteriors.
-  # Currently: RIRC model (so no site-by-treatment interactions)
-  mod = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )
+  ### run frequentist multilevel model (FIRC)
   
-  res = as.data.frame( coef( mod )$sid )       # point estimates of fixed effect + random effects
-  ses_rand = as.data.frame( se.coef(mod)$sid ) # standard errors of random effect for Z
-  se_fixed <- se.coef(mod)$fixef[2]            # standard error of fixed effect for Z
-  ses <- ses_rand %>%
-    mutate(Z_fixed = se_fixed,
-           Z_rand = Z,
-           Z = sqrt(Z^2 + se_fixed^2))
+  # FIRC model
+  # mod = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )   # RIRC model
+  mod = lmer( Yobs ~ 1 + Z + (0+Z|sid), data=dat)
   
-  # ISSUE: using sqrt(se(RE for Z)^2 + se(FE for Z)^2) doesn't get us correct EB coverage
-  #  - should it? unclear.
-  browser()
+  res_firc <- tibble(
+    sid = as.character(1:J),
+    ATEhat_firc = coef(mod)$sid$Z,
+    SE_firc_fixed = se.fixef(mod)[2],
+    SE_firc_rand = as.vector(se.ranef(mod)$sid)
+  )
   
-  res = tibble( sid = rownames( ranef( mod )$sid ),
-                est = res$Z,
-                SE = ses$Z,
-                SE_fixed = ses$Z_fixed,
-                SE_rand = ses$Z_rand,
-                t = est / SE,
-                pvalue_one = pnorm(-t))
+  ### run bayesian multilevel models
   
-  res = left_join( res, sdat, by="sid" ) %>%
-    dplyr::select( -W, -u0, -u1, -beta.0 )  %>%
-    rename( ATE_hat = est,
-            ATE = beta.1 )
+  # make dataset for bayesian models
+  stan_df <- make_site_summaries(dat)
+  stan_list <- list(
+    J = J,
+    site_mn_obs = stan_df$tau.hat,
+    site_sd_obs = stan_df$SE)
   
-  res %>%
+  ## normal bayesian model
+
+  # load model, if not already loaded (loading models takes time)
+  if (!exists("mod_norm")) {
+    # global assignment to avoid garbage collection and subsequent recompiling
+    mod_norm <<- stan_model("Stan/dp_normal_reparam.stan",
+                            model_name = "norm",
+                            auto_write = T)
+  }
+  
+  # sample!
+  fit_norm <- sampling(mod_norm,
+                       data = stan_list,
+                       iter = 2000,
+                       chains = 4,
+                       control = list(max_treedepth = 12,
+                                      adapt_delta = 0.95),
+                       verbose = F, 
+                       show_messages = F, 
+                       refresh = 0)
+  samples_norm <- rstan::extract(fit_norm)
+  names(samples_norm)
+  
+  # get site-effect estimates from samples
+  site_effects_norm <- samples_norm$site_mn
+  if (FALSE) {
+    site_effects_norm %>%
+      as_tibble() %>%
+      pivot_longer(everything()) %>%
+    ggplot() +
+      geom_histogram(aes(x=value)) +
+      facet_wrap(~name)
+  }
+  res_bayesnorm <- tibble(
+    sid = as.character(1:J),
+    ATEhat_bayesnorm = apply(site_effects_norm, 2, mean),
+    SE_bayesnorm = apply(site_effects_norm, 2, sd))
+  
+  
+  ##### compile results #####
+  
+  as_tibble(sdat) %>%
+    select(sid, n, ATE = beta.1) %>%
     left_join(res_single, by="sid") %>%
+    left_join(res_firc, by="sid") %>%
+    left_join(res_bayesnorm, by="sid") %>%
     mutate(is_singular = isSingular(mod))   # indicate if model fit was singular
 }
 
 
-if ( T ) {
-  os <- one_sim( n=500, J=20, tau=0.2, ICC=0.9, tx_var=0.3)
-  mean( os$ATE )
-  mean( os$ATE_hat )
-  ggplot( os, aes( ATE, ATE_hat ) ) +
-    geom_point() +
-    geom_abline( slope=1, intercept= 0 )
+if ( F ) {
+  os <- one_sim( n=50, J=20, tau=5, ICC=0, tx_var=0.3)
+  
+  ATEhats <- os %>%
+    pivot_longer(contains("ATEhat"), names_to = "method", values_to = "ATEhat") %>%
+    select(sid, method, ATEhat) %>%
+    mutate(method = str_sub(method, 8))
+  SEs <- os %>%
+    mutate(SE_firc = sqrt(SE_firc_fixed^2 + SE_firc_rand^2)) %>%
+    pivot_longer(contains("SE_"), names_to = "method", values_to = "SE") %>%
+    select(sid, method, SE) %>%
+    mutate(method = str_sub(method, 4))
+  
+  tidy_results <- os %>%
+    select(sid, n, ATE) %>%
+    left_join(ATEhats, by=c("sid")) %>%
+    left_join(SEs, by=c("sid", "method"))
+  
+  ggplot(tidy_results, aes(x = ATE, color = method)) +
+    geom_point(aes(y = ATEhat)) +
+    geom_errorbar(aes(ymin = ATEhat - 1.96*SE, 
+                      ymax = ATEhat + 1.96*SE)) +
+    facet_wrap(~method) +
+    geom_abline(slope = 1)
+  
+  # check one-tailed test
+  tidy_results %>%
+    mutate(pvalue_one = pnorm(-ATEhat/SE),
+           reject = pvalue_one < 0.1)
 }
 
 # function: (# obs, effect size) => (power)
@@ -150,7 +217,7 @@ power_sim <- function(n, J, tau, ICC, tx_var, NUMSIM = 250) {
   rs
 }
 
-if ( FALSE ) {
+if ( F ) {
   power_sim( n=20, J=20, tau=0.2, ICC=0, tx_var=0, NUMSIM=3 )
 }
 
@@ -172,7 +239,7 @@ df_sim <- expand_grid(
 tic()
 df_sim <- df_sim %>%
   rowwise() %>%
-  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 250)))
+  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 50)))
 toc()
 
 # raw results: unnest df_sim & record pvalue_one per site
@@ -185,7 +252,7 @@ hits = df_sim %>%
 # save results
 #####
 
-FNAME <- "sim_results_fixed"
+FNAME <- "sim_results_bayes"
 fname <- glue("results/", FNAME, ".csv")
 
 if (file.exists(fname)) {

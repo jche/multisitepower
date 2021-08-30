@@ -50,3 +50,4 @@ vignettes/*.pdf
 /plots
 /results
 /meeting_notes
+/Stan/*.rds
