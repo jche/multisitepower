@@ -104,18 +104,26 @@ one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
     ungroup() %>%
     mutate(sid = as.character(sid))
   
-  ### run frequentist multilevel model (FIRC)
-  
+  ### run frequentist multilevel models (FIRC and RIRC)
+
   # FIRC model
-  # mod = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )   # RIRC model
-  mod = lmer( Yobs ~ 1 + Z + (0+Z|sid), data=dat)
-  
+  mod_firc = lmer( Yobs ~ 1 + Z + (0+Z|sid), data=dat)
   res_firc <- tibble(
     sid = as.character(1:J),
-    ATEhat_firc = coef(mod)$sid$Z,
-    SE_firc_fixed = se.fixef(mod)[2],
-    SE_firc_rand = as.vector(se.ranef(mod)$sid)
+    ATEhat_firc = coef(mod_firc)$sid$Z,
+    SE_firc_fixed = se.fixef(mod_firc)[2],
+    SE_firc_rand = as.numeric(se.ranef(mod_firc)$sid)
   )
+
+  # RIRC model
+  mod_rirc = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )
+  res_rirc <- tibble(
+    sid = as.character(1:J),
+    ATEhat_rirc = coef(mod_rirc)$sid$Z,
+    SE_rirc_fixed = se.fixef(mod_rirc)[2],
+    SE_rirc_rand = se.ranef(mod_rirc)$sid[,2]
+  )
+  
   
   ### run bayesian multilevel models
   
@@ -171,20 +179,22 @@ one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
     select(sid, n, ATE = beta.1) %>%
     left_join(res_single, by="sid") %>%
     left_join(res_firc, by="sid") %>%
+    left_join(res_rirc, by="sid") %>%
     left_join(res_bayesnorm, by="sid") %>%
-    mutate(is_singular = isSingular(mod))   # indicate if model fit was singular
+    mutate(is_singular = isSingular(mod_firc))   # indicate if FIRC model fit was singular
 }
 
 
-if ( F ) {
-  os <- one_sim( n=50, J=20, tau=5, ICC=0, tx_var=0.3)
+if ( T ) {
+  os <- one_sim( n=50, J=20, tau=5, ICC=0.6, tx_var=0.3)
   
   ATEhats <- os %>%
     pivot_longer(contains("ATEhat"), names_to = "method", values_to = "ATEhat") %>%
     select(sid, method, ATEhat) %>%
     mutate(method = str_sub(method, 8))
   SEs <- os %>%
-    mutate(SE_firc = sqrt(SE_firc_fixed^2 + SE_firc_rand^2)) %>%
+    mutate(SE_firc = sqrt(SE_firc_fixed^2 + SE_firc_rand^2),
+           SE_rirc = sqrt(SE_rirc_fixed^2 + SE_rirc_rand^2)) %>%
     pivot_longer(contains("SE_"), names_to = "method", values_to = "SE") %>%
     select(sid, method, SE) %>%
     mutate(method = str_sub(method, 4))
@@ -228,10 +238,10 @@ if ( F ) {
 
 # simulation settings
 df_sim <- expand_grid(
-  n   = c(25, 50, 75, 100),
-  J   = c(20),
-  ICC = c(0, 0.3, 0.6, 0.9),
-  tau = c(0.01, 0.2, 0.5, 0.8),
+  n   = c(25, 100),
+  J   = c(25, 100),
+  ICC = c(0, 0.6),
+  tau = c(0.01, 0.5),
   tx_var = c(0.3)
 )
 
@@ -239,7 +249,7 @@ df_sim <- expand_grid(
 tic()
 df_sim <- df_sim %>%
   rowwise() %>%
-  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 50)))
+  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 100)))
 toc()
 
 # raw results: unnest df_sim & record pvalue_one per site
@@ -252,7 +262,7 @@ hits = df_sim %>%
 # save results
 #####
 
-FNAME <- "sim_results_bayes"
+FNAME <- "sim_results_bayesrirc"
 fname <- glue("results/", FNAME, ".csv")
 
 if (file.exists(fname)) {
