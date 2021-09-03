@@ -84,7 +84,6 @@ one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
   if (tx_var == 0) {
     sdat$beta.1[1] <- 0.2   # idea: set treatment effect for site 1 to 0.2, so there is at least one site with ATE=0.2 for our visualizations
   }
-  
   head(sdat)
   
   # Note: generate_individual_data() is not in CRAN version of package
@@ -107,12 +106,13 @@ one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
   ### run frequentist multilevel models (FIRC and RIRC)
 
   # FIRC model
-  mod_firc = lmer( Yobs ~ 1 + Z + (0+Z|sid), data=dat)
+  #  - note: no intercept, so site #1 is the "intercept"
+  mod_firc = lmer( Yobs ~ 0 + as.factor(sid) + Z + (0+Z|sid), data=dat)
   res_firc <- tibble(
     sid = as.character(1:J),
     ATEhat_firc = coef(mod_firc)$sid$Z,
-    SE_firc_fixed = se.fixef(mod_firc)[2],
-    SE_firc_rand = as.numeric(se.ranef(mod_firc)$sid)
+    SE_firc_fixed = se.fixef(mod_firc)["Z"],
+    SE_firc_rand = se.ranef(mod_firc)$sid[,"Z"]
   )
 
   # RIRC model
@@ -120,9 +120,50 @@ one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
   res_rirc <- tibble(
     sid = as.character(1:J),
     ATEhat_rirc = coef(mod_rirc)$sid$Z,
-    SE_rirc_fixed = se.fixef(mod_rirc)[2],
-    SE_rirc_rand = se.ranef(mod_rirc)$sid[,2]
+    SE_rirc_fixed = se.fixef(mod_rirc)["Z"],
+    SE_rirc_rand = se.ranef(mod_rirc)$sid[,"Z"]
   )
+  
+  
+  
+  sim_firc <- sim(mod_firc, n.sims = 5000)
+  
+  browser()
+  
+  if (FALSE) {
+    
+    # se.ranef uses:
+    object <- mod_firc
+    sqrt(attr( ranef( object, condVar = TRUE )[[1]], "postVar" ))
+    se.ranef(mod_firc)
+    #  this is square root of the "conditional variance-covariance matrices of the random effects"
+    #   - random effects shouldn't have covariances, right? so it's a diagonal matrix
+    #   - what does the "conditional" piece mean?
+    
+    # using the model built-in function gives lower standard errors...?
+    #  - worse for lower standard errors (larger sites)...
+    tibble(
+      # using_samples = apply(coef(sim_firc)[["ranef"]]$sid[,,"Z"], 2, function(x) sd(x + coef(sim_firc)[["fixef"]][,"Z"])),   # our actual standard errors that we want!
+      using_samples = apply(coef(sim_firc)[["ranef"]]$sid[,,"Z"], 2, sd),
+      # using_model = se.ranef(mod_firc)$sid[,"Z"]
+      using_model = se.ranef(mod_firc)$sid[,"Z"] + se.fixef(mod_firc)["Z"]
+    ) %>%
+      ggplot() +
+      geom_point(aes(x=using_model, y=using_samples)) +
+      geom_abline() +
+      coord_cartesian(xlim = c(0.05, 0.25), ylim = c(0.1, 0.3))
+    
+    # Q: how to recover model-function's SEs for random effects?
+    #  - we match exactly for fixed effects
+    #  - we can't recover what se.ranef outputs by using our samples...
+    
+    # the fixed effects have the same standard errors...
+    tibble(using_model = se.fixef(mod_firc),
+           using_samples =   coef(sim_firc)[["fixef"]] %>% apply(., 2, sd)) %>%
+      ggplot() +
+      geom_point(aes(x=using_model, y=using_samples)) +
+      geom_abline()
+  }
   
   
   ### run bayesian multilevel models
@@ -186,7 +227,7 @@ one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
 
 
 if ( T ) {
-  os <- one_sim( n=50, J=20, tau=5, ICC=0.6, tx_var=0.3)
+  os <- one_sim( n=100, J=100, tau=5, ICC=0.6, tx_var=0.3)
   
   ATEhats <- os %>%
     pivot_longer(contains("ATEhat"), names_to = "method", values_to = "ATEhat") %>%
@@ -238,10 +279,10 @@ if ( F ) {
 
 # simulation settings
 df_sim <- expand_grid(
-  n   = c(25, 100),
-  J   = c(25, 100),
-  ICC = c(0, 0.6),
-  tau = c(0.01, 0.5),
+  n   = c(25, 50, 75),
+  J   = c(25, 50, 75),
+  ICC = c(0, 0.3, 0.6),
+  tau = c(0.01, 0.2, 0.5),
   tx_var = c(0.3)
 )
 
@@ -249,7 +290,7 @@ df_sim <- expand_grid(
 tic()
 df_sim <- df_sim %>%
   rowwise() %>%
-  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 100)))
+  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 50)))
 toc()
 
 # raw results: unnest df_sim & record pvalue_one per site
@@ -262,7 +303,7 @@ hits = df_sim %>%
 # save results
 #####
 
-FNAME <- "sim_results_bayesrirc"
+FNAME <- "sim_results_bayes"
 fname <- glue("results/", FNAME, ".csv")
 
 if (file.exists(fname)) {
