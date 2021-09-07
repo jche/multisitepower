@@ -111,18 +111,20 @@ Assume a model for individuals $i$ in sites $j$ of:
 		0 \\ 0
 	\end{pmatrix}, 
 	\begin{bmatrix}
-		ICC & \rho \\ \rho & \omega
+		\rho_{00} & \rho_{01} \\ \rho_{10} & \rho_{11}
 	\end{bmatrix}\right) \\
 	\epsilon_{ij} &\sim N(0, \sigma^2) ,
 \end{align*}
-where $Z_{ij}$ are the individual treatment indicators, $\tau$ is the overall site-average treatment impact, and $\omega$ is the amount of cross site variation.
-The $u_{0j}$ are the random intercepts for the sites, and the $u_{1j}$ are how the sites vary from each other in terms of average treatment impact.
-We fix  $Var(Y_{ij}(0)) = Var(\alpha_j) + Var(\epsilon_{ij}) = 1$ to be in effect size units.
+where $Z_{ij}$ are the individual treatment indicators, $\tau$ is the overall site-average treatment impact, and the $\rho$ parameters control the covariance of the random effects.
+The $u_{0j}$ are random intercepts for control outcomes across sites (with variance $\rho_{00}$) and the $u_{1j}$ are random treatment effects across sites (with variance $\rho_{11}$).
 
-The effect size scaling gives the variance of our random intercepts in terms of the Intra Class Correlation Coefficient (ICC) of:
-$$ ICC = \frac{Var(\alpha_i)}{Var(\alpha_j) + Var(\epsilon_{ij})} = Var(\alpha_j).$$
-This also dictates that our within-site residual variation $\sigma^2$ equals $1-ICC$.
-We ignore additional covariate adjustment for the moment for clarity.
+We simulate data under this model, using some simplifying assumptions.
+We set $\rho{10} = \rho_{01} = 0$ so that intercept and treatment random effects are uncorrelated.
+We also fix $Var(Y_{ij}(0)) = Var(\alpha_j) + Var(\epsilon_{ij}) = 1$ so that the control-unit outcomes are in effect size units.
+This scaling gives the variance of our random intercepts in terms of the Intra Class Correlation Coefficient (ICC) of:
+$$ICC = \frac{Var(\alpha_i)}{Var(\alpha_j) + Var(\epsilon_{ij})} = Var(\alpha_j) = \rho_{00}$$
+This also dictates that the within-site residual variation must be $\sigma^2 = 1-ICC$ so that the control-unit outcomes have variance 1 within each site.
+We ignore additional covariate adjustments for the moment for clarity.
 
 The simplest, completely unpooled test of whether an individual site had a positive effect would be to drop the rest of the data and test the difference in means of the treatment and control groups at that site.
 The power to detect effects locally in this manner is purely a function of the site sample size, variation in outcomes within the site, and the size of the true site average impact.
@@ -190,10 +192,12 @@ As such, we opt to not employ this simulation strategy.
 This approach circumvents the previous complications regarding the data-generating distribution; data are generated exactly according to the theoretical model, and there are no gaps or additions caused by removing or adding $\tau_j$ values for the site of interest.
 
 All-site simulation, however, still runs into similar complications as set-site simulation.
-For a given context $G(\cdot)$, there is natural variation between simulations of $\tau_1, \dots, \tau_J \sim G(\cdot)$; in particular, some simulations will have higher true $\bar{\tau} = \frac{1}{J} \sum_{j=1}^J \tau_j$ values and others will have lower $\bar{\tau}$ values, simply due to random chance, especially if $J$ is small.
-When we summarize the results for higher values of $\tau_j$ across simulation runs of the same theoretical context $G(\cdot)$, we notice that those higher-$\tau_j$-value sites come from simulated contexts with higher $\bar{\tau}$ values, on average.
-In other words, because we include the sites of interest within their ``contexts,'' sites of interest with higher $\tau_j$ values will naturally have contexts with higher $\bar{\tau}$ values.
-Given a fixed context-generating distribution $G(\cdot)$, this makes comparison across different $\tau_j$ values for the site of interest quite challenging, because the higher $\tau_j$ values come from simulations with higher $\bar{\tau}$ values.
+Because each site of interest is included within its ``context,'' sites of interest with higher $\tau_j$ values will naturally have contexts with higher $\bar{\tau}$ values, on average.
+As with set-site simulation, we need to be careful when interpreting comparisons across $\tau_j$ values for a fixed context.
+%For a given context $G(\cdot)$, there is natural variation between simulations of $\tau_1, \dots, \tau_J \sim G(\cdot)$; in particular, some simulations will have higher true $\bar{\tau} = \frac{1}{J} \sum_{j=1}^J \tau_j$ values and others will have lower $\bar{\tau}$ values, simply due to random chance, especially if $J$ is small.
+%When we summarize the results for higher values of $\tau_j$ across simulation runs of the same theoretical context $G(\cdot)$, we notice that those higher-$\tau_j$-value sites come from simulated contexts with higher $\bar{\tau}$ values, on average.
+%In other words, because we include the sites of interest within their ``contexts,'' sites of interest with higher $\tau_j$ values will naturally have contexts with higher $\bar{\tau}$ values.
+%Given a fixed context-generating distribution $G(\cdot)$, this makes comparison across different $\tau_j$ values for the site of interest quite challenging, because the higher $\tau_j$ values come from simulations with higher $\bar{\tau}$ values.
 Another minor challenge with the all-site approach is that we cannot directly specify the $\tau_j$ values of our sites of interest, which means that the range of possible $\tau_j$ values (and how frequently extreme $\tau_j$ values appear) is constrained by our context.
 
 As a result, all-site simulation answers a slightly different question than does set-site simulation: if I have a particular context and am interested in a site that happens to have a particular true effect within that context, what is the chance that I detect an effect for it?
