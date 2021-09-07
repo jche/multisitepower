@@ -15,41 +15,6 @@ require(tidyverse)
 require(glue)
 require(tictoc)
 
-
-#####
-# simulation functions
-#####
-
-# given a df for a single site, run a one-sided t-test
-run_t_test <- function(df) {
-  
-  df %>%
-    summarize(t = list(t.test(Y1[Z==1], Y0[Z==0], alternative = "greater"))) %>%
-    mutate(ATEhat_single = t[[1]]$estimate["mean of x"] - t[[1]]$estimate["mean of y"],
-           SE_single = t[[1]]$stderr
-           # t_single = t[[1]]$statistic,
-           # pvalue_single = t[[1]]$p.value
-           ) %>%
-    select(-t)
-}
-
-# given the full df with individual observations,
-# make df with site-level summaries for rstan functions
-make_site_summaries <- function( df ) {
-  df %>%
-    group_by(sid, Z) %>%
-    summarize(ybar = mean(Yobs),
-              n = n(),
-              V = var(Yobs)) %>%
-    pivot_wider(names_from = "Z", 
-                values_from = ybar:V, 
-                names_sep = ".") %>%
-    ungroup() %>%
-    mutate(pool.se2 = sum( V.1 * (n.1-1) + V.0 * (n.0-1) ) / sum( n.1 + n.0 - 2 ),
-           tau.hat = ybar.1 - ybar.0,
-           SE = sqrt(pool.se2 / n.1 + pool.se2 / n.0))
-}
-
 # function: (# obs, effect size) => (reject null? T/F)
 #' 
 #'
@@ -62,29 +27,26 @@ make_site_summaries <- function( df ) {
 #' @export
 #'
 #' @examples
-one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
+one_sim <- function(n, J, tau, ICC, tx_var, 
+                    variable.n = F,
+                    site_sim_method = c("all-site", "set-site"),
+                    set_site_effect = NULL,
+                    set_site_size = NULL,
+                    round_sites = NULL, 
+                    NUMSAMP = 2000) {
+  
+  method <- match.arg(site_sim_method)
   
   ##### simulate data #####
   
-  sdat = blkvar::generate_multilevel_data( n.bar=n, J=J,
-                                           # variable.n = FALSE,
-                                           variable.n = TRUE,
-                                           tau.11.star = tx_var,   # cross-site tx var
-                                           gamma.10 = tau,      # cross-site ATE
-                                           ICC = ICC,           # ICC [really var(intercepts)]
-                                           rho2.0W = 0,         # covariate has no explanatory power 
-                                           rho2.1W = 0,
-                                           zero.corr = T,       # don't correlate site intercepts and treatment effects (so treatment group is higher variance)
-                                           return.sites = TRUE,
-                                           verbose = FALSE) %>%
-    mutate(sid = as.character(1:n()),
-           beta.1 = round(beta.1/round_sites) * round_sites)    # round to nearest round_sites
+  sdat <- gen_sdat(n=n, J=J, tau=tau, ICC=ICC, tx_var=tx_var,
+                   variable.n = variable.n,
+                   method = method, 
+                   set_site_effect = set_site_effect,
+                   set_site_size = set_site_size,
+                   round_sites = round_sites)
   
-  # manually add in a site with ATE = 0.2
-  if (tx_var == 0) {
-    sdat$beta.1[1] <- 0.2   # idea: set treatment effect for site 1 to 0.2, so there is at least one site with ATE=0.2 for our visualizations
-  }
-  head(sdat)
+  # browser()
   
   # Note: generate_individual_data() is not in CRAN version of package
   # dat = blkvar::generate_individual_data( sdat )
@@ -106,29 +68,37 @@ one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
   ### run frequentist multilevel models (FIRC and RIRC)
 
   # FIRC model
-  #  - note: no intercept, so site #1 is the "intercept"
+  #  - note: no intercept, so site #1 is what the "intercept" would be
   mod_firc = lmer( Yobs ~ 0 + as.factor(sid) + Z + (0+Z|sid), data=dat)
+  
+  # grabbing arm package samples
+  sim_firc <- sim(mod_firc, n.sims = NUMSAMP)
+  fixef_samps_firc <- coef(sim_firc)[["fixef"]][,"Z"]
+  ranef_samps_firc <- coef(sim_firc)[["ranef"]]$sid[,,"Z"]
+  
   res_firc <- tibble(
     sid = as.character(1:J),
     ATEhat_firc = coef(mod_firc)$sid$Z,
     SE_firc_fixed = se.fixef(mod_firc)["Z"],
-    SE_firc_rand = se.ranef(mod_firc)$sid[,"Z"]
+    SE_firc_rand = se.ranef(mod_firc)$sid[,"Z"],
+    SE_firc = apply(ranef_samps_firc, 2, function(x) sd(x + fixef_samps_firc))
   )
 
   # RIRC model
   mod_rirc = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )
+  
+  # grabbing arm package samples
+  sim_rirc <- sim(mod_rirc, n.sims = NUMSAMP)
+  fixef_samps_rirc <- coef(sim_rirc)[["fixef"]][,"Z"]
+  ranef_samps_rirc <- coef(sim_rirc)[["ranef"]]$sid[,,"Z"]
+  
   res_rirc <- tibble(
     sid = as.character(1:J),
     ATEhat_rirc = coef(mod_rirc)$sid$Z,
     SE_rirc_fixed = se.fixef(mod_rirc)["Z"],
-    SE_rirc_rand = se.ranef(mod_rirc)$sid[,"Z"]
+    SE_rirc_rand = se.ranef(mod_rirc)$sid[,"Z"],
+    SE_rirc = apply(ranef_samps_rirc, 2, function(x) sd(x + fixef_samps_rirc))
   )
-  
-  
-  
-  sim_firc <- sim(mod_firc, n.sims = 5000)
-  
-  browser()
   
   if (FALSE) {
     
@@ -188,13 +158,26 @@ one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
   # sample!
   fit_norm <- sampling(mod_norm,
                        data = stan_list,
-                       iter = 2000,
+                       iter = NUMSAMP,
                        chains = 4,
                        control = list(max_treedepth = 12,
                                       adapt_delta = 0.95),
                        verbose = F, 
                        show_messages = F, 
                        refresh = 0)
+  
+  # withCallingHandlers(
+  #   warning = function(cnd) { 
+  #     if (str_detect(cnd$message, "divergent")) {
+  #       num_divergences <- str_extract(cnd$message, "\\d+") %>%
+  #         as.numeric()
+  #     } else {
+  #       num_warnings <<- num_warnings + 1 
+  #     }
+  #   },
+  #   { mixes = EST(sites, verbose = VERBOSE, do.vb = DO_VB) }
+  # )
+  
   samples_norm <- rstan::extract(fit_norm)
   names(samples_norm)
   
@@ -226,8 +209,63 @@ one_sim <- function(n, J, tau, ICC, tx_var, round_sites = 0.05) {
 }
 
 
+# generate site-level data
+gen_sdat <- function(n, J, tau, ICC, tx_var, 
+                     variable.n,
+                     method, 
+                     set_site_effect,
+                     set_site_size,
+                     round_sites) {
+  
+  sdat = blkvar::generate_multilevel_data( n.bar = n, 
+                                           J = ifelse(method == "set-site", J-1, J),
+                                           variable.n = variable.n,
+                                           tau.11.star = tx_var,   # cross-site tx var
+                                           gamma.10 = tau,      # cross-site ATE
+                                           ICC = ICC,           # ICC [really var(intercepts)]
+                                           rho2.0W = 0,         # covariate has no explanatory power 
+                                           rho2.1W = 0,
+                                           zero.corr = T,       # don't correlate site intercepts and treatment effects (so treatment group is higher variance)
+                                           return.sites = TRUE,
+                                           verbose = FALSE) %>%
+    mutate(sid = as.character(1:n()))
+  
+  if (method == "all-site") {
+    
+    if (is.null(round_sites)) 
+      stop("Need to input rounding value for all-site simulation")
+    
+    sdat <- sdat %>%
+      mutate(beta.1 = round(beta.1/round_sites) * round_sites)
+  }
+  if (method == "set-site") {
+    
+    if (is.null(set_site_effect) | is.null(set_site_size)) 
+      stop("Need to input effect and sample size for set-site simulation")
+    
+    sdat <- sdat %>%
+      rbind(tibble(
+        n = set_site_size,
+        W = 0,
+        beta.0 = 0,
+        beta.1 = set_site_effect,
+        u0 = 0,
+        u1 = 0,
+        sid = J, 
+        ))
+  }
+  
+  return(sdat)
+}
+
+
 if ( T ) {
-  os <- one_sim( n=100, J=100, tau=5, ICC=0.6, tx_var=0.3)
+  # os <- one_sim( n=25, J=50, tau=0.01, ICC=0, tx_var=0.3)
+  os <- one_sim( n=25, J=50, tau=0.01, ICC=0, tx_var=0.3, 
+                 site_sim_method = "set-site", 
+                 set_site_effect = 0.2,
+                 set_site_size = 25)
+  browser()
   
   ATEhats <- os %>%
     pivot_longer(contains("ATEhat"), names_to = "method", values_to = "ATEhat") %>%
@@ -290,7 +328,7 @@ df_sim <- expand_grid(
 tic()
 df_sim <- df_sim %>%
   rowwise() %>%
-  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 50)))
+  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 10)))
 toc()
 
 # raw results: unnest df_sim & record pvalue_one per site
