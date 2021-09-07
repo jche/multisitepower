@@ -15,6 +15,10 @@ require(tidyverse)
 require(glue)
 require(tictoc)
 
+# source required functions
+source("simulation_functions.R")
+
+
 # function: (# obs, effect size) => (reject null? T/F)
 #' 
 #'
