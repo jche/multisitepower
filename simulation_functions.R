@@ -23,7 +23,8 @@ make_site_summaries <- function( df ) {
     group_by(sid, Z) %>%
     summarize(ybar = mean(Yobs),
               n = n(),
-              V = var(Yobs)) %>%
+              V = var(Yobs),
+              .groups = "drop_last") %>%
     pivot_wider(names_from = "Z", 
                 values_from = ybar:V, 
                 names_sep = ".") %>%

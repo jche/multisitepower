@@ -18,6 +18,11 @@ require(tictoc)
 # source required functions
 source("simulation_functions.R")
 
+# turn off summarize messages
+options(dplyr.summarise.inform = FALSE)
+
+# set simulation seed
+set.seed(90210)
 
 # function: (# obs, effect size) => (reject null? T/F)
 #' 
@@ -33,24 +38,25 @@ source("simulation_functions.R")
 #' @examples
 one_sim <- function(n, J, tau, ICC, tx_var, 
                     variable.n = F,
-                    site_sim_method = c("all-site", "set-site"),
-                    set_site_effect = NULL,
-                    set_site_size = NULL,
-                    round_sites = NULL, 
+                    round_sites = 0.05, 
                     NUMSAMP = 2000) {
-  
-  method <- match.arg(site_sim_method)
   
   ##### simulate data #####
   
-  sdat <- gen_sdat(n=n, J=J, tau=tau, ICC=ICC, tx_var=tx_var,
-                   variable.n = variable.n,
-                   method = method, 
-                   set_site_effect = set_site_effect,
-                   set_site_size = set_site_size,
-                   round_sites = round_sites)
-  
-  # browser()
+  sdat = blkvar::generate_multilevel_data( n.bar = n, 
+                                           J = J,
+                                           variable.n = variable.n,
+                                           tau.11.star = tx_var,   # cross-site tx var
+                                           gamma.10 = tau,      # cross-site ATE
+                                           ICC = ICC,           # ICC [really var(intercepts)]
+                                           rho2.0W = 0,         # covariate has no explanatory power 
+                                           rho2.1W = 0,
+                                           zero.corr = T,       # don't correlate site intercepts and treatment effects (so treatment group is higher variance)
+                                           return.sites = TRUE,
+                                           verbose = FALSE) %>%
+    mutate(sid = as.character(1:n()),
+           beta.1 = round(beta.1/round_sites) * round_sites)
+  head(sdat)
   
   # Note: generate_individual_data() is not in CRAN version of package
   # dat = blkvar::generate_individual_data( sdat )
@@ -58,6 +64,8 @@ one_sim <- function(n, J, tau, ICC, tx_var,
                                  sigma2.e = 1-ICC)   # need to specify this! or else sigma2.e = 1...
   head( dat )
   
+  
+  # browser()
   
   ##### run models #####
   
@@ -104,11 +112,12 @@ one_sim <- function(n, J, tau, ICC, tx_var,
     SE_rirc = apply(ranef_samps_rirc, 2, function(x) sd(x + fixef_samps_rirc))
   )
   
+  # figuring out what se.fixef/se.ranef are giving
   if (FALSE) {
+    # see https://stats.stackexchange.com/questions/68106/understanding-the-variance-of-random-effects-in-lmer-models for some comments here
     
     # se.ranef uses:
-    object <- mod_firc
-    sqrt(attr( ranef( object, condVar = TRUE )[[1]], "postVar" ))
+    sqrt(attr( ranef( mod_firc, condVar = TRUE )[[1]], "postVar" ))
     se.ranef(mod_firc)
     #  this is square root of the "conditional variance-covariance matrices of the random effects"
     #   - random effects shouldn't have covariances, right? so it's a diagonal matrix
@@ -159,28 +168,38 @@ one_sim <- function(n, J, tau, ICC, tx_var,
                             auto_write = T)
   }
   
-  # sample!
-  fit_norm <- sampling(mod_norm,
-                       data = stan_list,
-                       iter = NUMSAMP,
-                       chains = 4,
-                       control = list(max_treedepth = 12,
-                                      adapt_delta = 0.95),
-                       verbose = F, 
-                       show_messages = F, 
-                       refresh = 0)
-  
-  # withCallingHandlers(
-  #   warning = function(cnd) { 
-  #     if (str_detect(cnd$message, "divergent")) {
-  #       num_divergences <- str_extract(cnd$message, "\\d+") %>%
-  #         as.numeric()
-  #     } else {
-  #       num_warnings <<- num_warnings + 1 
-  #     }
-  #   },
-  #   { mixes = EST(sites, verbose = VERBOSE, do.vb = DO_VB) }
-  # )
+  # wrap in error detection
+  num_divergences <- 0
+  more_samples <- F
+  withCallingHandlers(
+    warning = function(cnd) {
+      # browser()
+      
+      if (str_detect(cnd$message, "Bulk Effective Samples Size")) {
+        print("Bulk ESS too low: doubling number of samples")
+        more_samples <<- T
+        fit_norm <- sampling(mod_norm,
+                             data = stan_list,
+                             iter = NUMSAMP,
+                             chains = 4,
+                             control = list(max_treedepth = 12,
+                                            adapt_delta = 0.95),
+                             verbose = F, 
+                             show_messages = F, 
+                             refresh = 0)
+      }
+    },
+    { # sample!
+      fit_norm <- sampling(mod_norm,
+                           data = stan_list,
+                           iter = NUMSAMP,
+                           chains = 4,
+                           control = list(max_treedepth = 12,
+                                          adapt_delta = 0.95),
+                           verbose = F, 
+                           show_messages = F, 
+                           refresh = 0) }
+  )
   
   samples_norm <- rstan::extract(fit_norm)
   names(samples_norm)
@@ -202,73 +221,20 @@ one_sim <- function(n, J, tau, ICC, tx_var,
   
   
   ##### compile results #####
-  
+
   as_tibble(sdat) %>%
     select(sid, n, ATE = beta.1) %>%
     left_join(res_single, by="sid") %>%
     left_join(res_firc, by="sid") %>%
     left_join(res_rirc, by="sid") %>%
     left_join(res_bayesnorm, by="sid") %>%
-    mutate(is_singular = isSingular(mod_firc))   # indicate if FIRC model fit was singular
+    mutate(is_singular = isSingular(mod_firc) | isSingular(mod_rirc),   # indicate if either FIRC/RIRC was singular
+           ESS_low = more_samples)   # indiciate if we had to up the # samples for rstan
 }
 
 
-# generate site-level data
-gen_sdat <- function(n, J, tau, ICC, tx_var, 
-                     variable.n,
-                     method, 
-                     set_site_effect,
-                     set_site_size,
-                     round_sites) {
-  
-  sdat = blkvar::generate_multilevel_data( n.bar = n, 
-                                           J = ifelse(method == "set-site", J-1, J),
-                                           variable.n = variable.n,
-                                           tau.11.star = tx_var,   # cross-site tx var
-                                           gamma.10 = tau,      # cross-site ATE
-                                           ICC = ICC,           # ICC [really var(intercepts)]
-                                           rho2.0W = 0,         # covariate has no explanatory power 
-                                           rho2.1W = 0,
-                                           zero.corr = T,       # don't correlate site intercepts and treatment effects (so treatment group is higher variance)
-                                           return.sites = TRUE,
-                                           verbose = FALSE) %>%
-    mutate(sid = as.character(1:n()))
-  
-  if (method == "all-site") {
-    
-    if (is.null(round_sites)) 
-      stop("Need to input rounding value for all-site simulation")
-    
-    sdat <- sdat %>%
-      mutate(beta.1 = round(beta.1/round_sites) * round_sites)
-  }
-  if (method == "set-site") {
-    
-    if (is.null(set_site_effect) | is.null(set_site_size)) 
-      stop("Need to input effect and sample size for set-site simulation")
-    
-    sdat <- sdat %>%
-      rbind(tibble(
-        n = set_site_size,
-        W = 0,
-        beta.0 = 0,
-        beta.1 = set_site_effect,
-        u0 = 0,
-        u1 = 0,
-        sid = J, 
-        ))
-  }
-  
-  return(sdat)
-}
-
-
-if ( T ) {
-  # os <- one_sim( n=25, J=50, tau=0.01, ICC=0, tx_var=0.3)
-  os <- one_sim( n=25, J=50, tau=0.01, ICC=0, tx_var=0.3, 
-                 site_sim_method = "set-site", 
-                 set_site_effect = 0.2,
-                 set_site_size = 25)
+if ( F ) {
+  os <- one_sim( n=25, J=50, tau=0.01, ICC=0, tx_var=0.3)
   browser()
   
   ATEhats <- os %>%
@@ -302,11 +268,26 @@ if ( T ) {
 
 # function: (# obs, effect size) => (power)
 #  - runs one_sim NUMSIM times, so we can aggregate across runIDs to get the power
-power_sim <- function(n, J, tau, ICC, tx_var, NUMSIM = 250) {
-  cat(glue("Working on n = {n}, tau = {tau}, ICC = {ICC}, tx_var = {tx_var}\n\n"))
+power_sim <- function(n, J, tau, ICC, tx_var, NUMSIM = 250, 
+                      WRITE_CSV = F, fname = NULL) {
+  cat(glue("Working on n = {n}, J = {J}, ICC = {ICC}, tau = {tau}, tx_var = {tx_var}\n\n"))
   rs = tibble( runID = 1:NUMSIM )
   rs$data = map( rs$runID, ~one_sim(n, J, tau, ICC, tx_var))
   rs = unnest( rs, cols = data )
+
+  if(WRITE_CSV) {
+    nbar <- n
+    hits <- rs %>%
+      mutate(nbar = nbar, J=J, ICC=ICC, tau=tau, tx_var=tx_var,
+             .before = 1)
+    
+    if (!file.exists(fname)) {
+      write_csv(hits, fname)
+    } else {
+      write_csv(hits, fname, append=T)
+    }
+  }
+  
   rs
 }
 
@@ -332,33 +313,35 @@ df_sim <- expand_grid(
 tic()
 df_sim <- df_sim %>%
   rowwise() %>%
-  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 10)))
+  mutate(data = list(power_sim(n, J, tau, ICC, tx_var, NUMSIM = 100, 
+                               WRITE_CSV = T,
+                               fname="results/sim_results_bayes3.csv")))
 toc()
-
-# raw results: unnest df_sim & record pvalue_one per site
-hits = df_sim %>% 
-  rename( n_bar = n ) %>%
-  unnest( cols=data )
 
 
 #####
 # save results
 #####
 
-FNAME <- "sim_results_bayes"
-fname <- glue("results/", FNAME, ".csv")
+# # raw results: unnest df_sim & record pvalue_one per site
+# hits = df_sim %>% 
+#   rename( n_bar = n ) %>%
+#   unnest( cols=data )
 
-if (file.exists(fname)) {
-  # ASSUMING that all sim settings are run equally
-  max_runID <- read_csv(fname) %>%
-    pull(runID) %>%
-    max()
-  
-  hits %>% 
-    mutate(runID = runID + max_runID) %>%
-    write_csv(fname, append=T)
-} else {
-  write_csv(hits, fname)
-}
+# FNAME <- "sim_results_bayes"
+# fname <- glue("results/", FNAME, ".csv")
+# 
+# if (file.exists(fname)) {
+#   # ASSUMING that all sim settings are run equally
+#   max_runID <- read_csv(fname) %>%
+#     pull(runID) %>%
+#     max()
+#   
+#   hits %>% 
+#     mutate(runID = runID + max_runID) %>%
+#     write_csv(fname, append=T)
+# } else {
+#   write_csv(hits, fname)
+# }
 
 
