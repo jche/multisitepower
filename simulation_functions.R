@@ -11,10 +11,7 @@
 #' @param tau overall ATE
 #' @param ICC 
 #'
-#' @return tibble with J rows, 
-#' @export
-#'
-#' @examples
+#' @return tibble with J rows
 one_sim <- function(nbar, J, tau, ICC, tx_var, 
                     variable.n = F,
                     round_sites = 0.05, 
@@ -93,6 +90,8 @@ one_sim <- function(nbar, J, tau, ICC, tx_var,
   
   # figuring out what se.fixef/se.ranef are giving
   if (FALSE) {
+    # NOTE: sd of RIRC random effects columns is super small for some reason... definitely doesn't match what se.ranef() is giving!
+    
     # see https://stats.stackexchange.com/questions/68106/understanding-the-variance-of-random-effects-in-lmer-models for some comments here
     
     # se.ranef uses:
@@ -201,14 +200,27 @@ one_sim <- function(nbar, J, tau, ICC, tx_var,
   
   ##### compile results #####
   
-  as_tibble(sdat) %>%
+  # compile results for overall tau
+  mod_pooled <- lm(Yobs ~ 0 + as.factor(sid) + Z, data=dat)   # use pooled model
+  res_overall <- tibble(
+    method = c("FIRC", "RIRC", "Bayes", "Single"),
+    ATEhat = c(fixef(mod_firc)["Z"], fixef(mod_rirc)["Z"], 
+               mean(samples_norm$pop_mn), coef(mod_pooled)["Z"]),
+    SE     = c(se.fixef(mod_firc)["Z"], se.fixef(mod_rirc)["Z"], 
+               sd(samples_norm$pop_mn), summary(mod_pooled)$coef["Z",2]))
+  
+  # compile results for single-site tau_js
+  res_sites <- as_tibble(sdat) %>%
     dplyr::select(sid, n, ATE = beta.1) %>%
     left_join(res_single, by="sid") %>%
     left_join(res_firc, by="sid") %>%
     left_join(res_rirc, by="sid") %>%
     left_join(res_bayesnorm, by="sid") %>%
-    mutate(is_singular = isSingular(mod_firc) | isSingular(mod_rirc),   # indicate if either FIRC/RIRC was singular
-           ESS_low = more_samples)   # indiciate if we had to up the # samples for rstan
+    mutate(is_singular_firc = isSingular(mod_firc), # is FIRC model singular?
+           is_singular_rirc = isSingular(mod_rirc), # is RIRC model singular?
+           ESS_low = more_samples)                  # low ESS warning from rstan?
+  
+  return(list(overall = res_overall, sites = res_sites))
 }
 
 
@@ -247,11 +259,14 @@ if ( F ) {
 
 # function: (# obs, effect size) => (power)
 #  - runs one_sim NUMSIM times, so we can aggregate across runIDs to get the power
-power_sim <- function(nbar, J, tau, ICC, tx_var, NUMSIM = 250, 
-                      WRITE_CSV = F, fname = NULL) {
+power_sim <- function(nbar, J, tau, ICC, tx_var, 
+                      variable.n = F,
+                      NUMSIM = 250, 
+                      WRITE_CSV = F, 
+                      fname = NULL) {
   cat(glue("Working on nbar = {nbar}, J = {J}, ICC = {ICC}, tau = {tau}, tx_var = {tx_var}\n\n"))
   rs = tibble( runID = 1:NUMSIM )
-  rs$data = map( rs$runID, ~one_sim(nbar, J, tau, ICC, tx_var))
+  rs$data = map( rs$runID, ~one_sim(nbar, J, tau, ICC, tx_var, variable.n))
   rs = unnest( rs, cols = data )
   
   if(WRITE_CSV) {

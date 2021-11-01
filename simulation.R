@@ -16,6 +16,7 @@ library(rstan)   # bayesian models!
 require(tidyverse)
 require(glue)
 require(tictoc)
+require(uuid)
 
 # source required functions
 source("simulation_functions.R")
@@ -24,11 +25,11 @@ source("simulation_functions.R")
 options(dplyr.summarise.inform = FALSE)
 
 # set simulation seed
-set.seed(02141)
+# set.seed(02141)
 
 # initialize parallel backend
 #  - good tutorial: https://www.blasbenito.com/post/02_parallelizing_loops_with_r/
-PARALLEL <- TRUE
+PARALLEL <- F
 if (PARALLEL) {
   require(foreach)
   require(doParallel)
@@ -46,11 +47,12 @@ if (PARALLEL) {
 #####
 
 # simulation settings
+NUMSIM <- 10
 df_sim <- expand_grid(
-  nbar= c(25, 50, 75),
-  J   = c(25, 50, 75),
-  ICC = c(0, 0.3, 0.6),
-  tau = c(0.01, 0.2, 0.5),
+  nbar   = seq(25, 300, by=25),
+  J      = c(20),
+  ICC    = c(0.2),
+  tau    = c(0.3),
   tx_var = c(0.3)
 )
 
@@ -69,7 +71,8 @@ if (PARALLEL) {
                    
                    # power_sim
                    power_sim(nbar=nbar, J=J, ICC=ICC, tau=tau, tx_var=tx_var,
-                             NUMSIM = 10,
+                             variable.n = T,   # vary site sizes!
+                             NUMSIM = NUMSIM,
                              WRITE_CSV = F) %>%
                       mutate(nbar = nbar, J=J, ICC=ICC, tau=tau, tx_var=tx_var,
                              .before = 1)
@@ -84,13 +87,21 @@ if (PARALLEL) {
   tic()
   df_sim <- df_sim %>%
     rowwise() %>%
-    mutate(data = list(power_sim(nbar, J, tau, ICC, tx_var, NUMSIM = 10, 
+    mutate(data = list(power_sim(nbar, J, tau, ICC, tx_var, 
+                                 variable.n = T,   # vary site sizes!
+                                 NUMSIM = NUMSIM, 
                                  WRITE_CSV = F)))
-  sim <- df_sim %>%
+  # aggregate site-level results
+  sim_sites <- df_sim %>%
+    unnest(cols = data) %>%
+    filter(names(data) == "sites") %>%
+    unnest(cols = data)
+  # aggregate overall results
+  sim_overall <- df_sim %>%
+    unnest(cols = data) %>%
+    filter(names(data) == "overall") %>%
     unnest(cols = data)
   toc()
-  
-  # 956.9 seconds, 10 runs x 16 factors
 }
 
 
@@ -98,19 +109,35 @@ if (PARALLEL) {
 # save results
 #####
 
-FNAME <- "sim_results_bayes3"
-fname <- glue("results/", FNAME, ".csv")
+FNAME <- "sim_results_edited"
+UUID  <- substr(UUIDgenerate(), 25, 36)
 
-if (file.exists(fname)) {
+# save site-level results
+fname_sites <- glue("results/{FNAME}-{UUID}.csv")
+if (file.exists(fname_sites)) {
   # ASSUMING that all sim settings are run equally
-  max_runID <- read_csv(fname) %>%
+  max_runID <- read_csv(fname_sites) %>%
     pull(runID) %>%
     max()
 
-  sim %>%
+  sim_sites %>%
     mutate(runID = runID + max_runID) %>%
-    write_csv(fname, append=T)
+    write_csv(fname_sites, append=T)
 } else {
-  write_csv(hits, fname)
+  write_csv(sim_sites, fname_sites)
 }
 
+# save overall results
+fname_overall <- glue("results/{FNAME}_overall-{UUID}.csv")
+if (file.exists(fname_overall)) {
+  # ASSUMING that all sim settings are run equally
+  max_runID <- read_csv(fname_overall) %>%
+    pull(runID) %>%
+    max()
+  
+  sim_overall %>%
+    mutate(runID = runID + max_runID) %>%
+    write_csv(fname_overall, append=T)
+} else {
+  write_csv(sim_overall, fname_overall)
+}
