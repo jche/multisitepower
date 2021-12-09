@@ -49,10 +49,11 @@ if (PARALLEL) {
 # simulation settings
 NUMSIM <- 10
 df_sim <- expand_grid(
-  nbar   = seq(25, 300, by=25),
-  J      = c(20),
+  # nbar   = seq(25, 300, by=25),
+  nbar   = c(10, 25, 100, 300),
+  J      = c(10, 25, 100, 300),
   ICC    = c(0.2),
-  tau    = c(0.3),
+  tau    = c(0, 0.2, 0.5),
   tx_var = c(0.3)
 )
 
@@ -109,7 +110,8 @@ if (PARALLEL) {
 # save results
 #####
 
-FNAME <- "sim_results_edited"
+# FNAME <- "sim_ex_tau02"
+FNAME <- "final_sim"
 UUID  <- substr(UUIDgenerate(), 25, 36)
 
 # save site-level results

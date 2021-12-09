@@ -4,8 +4,10 @@
 require(tidyverse)
 require(glue)
 
-dir <- "results2"
+dir <- "results"
 fhead <- "sim_results_edited"
+# fhead <- "sim_results_edited-"
+# fhead <- "sim_results_tau02"
 
 all_files <- list.files(dir)
 

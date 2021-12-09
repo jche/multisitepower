@@ -55,7 +55,7 @@ one_sim <- function(nbar, J, tau, ICC, tx_var,
   
   ### run frequentist multilevel models (FIRC and RIRC)
   
-  # FIRC model
+  # FIRC model #1 (pooled variances, via lmer and arm packages)
   #  - note: no intercept, so site #1 is what the "intercept" would be
   mod_firc = lmer( Yobs ~ 0 + as.factor(sid) + Z + (0+Z|sid), data=dat)
   
@@ -71,6 +71,25 @@ one_sim <- function(nbar, J, tau, ICC, tx_var,
     SE_firc_rand = se.ranef(mod_firc)$sid[,"Z"],
     SE_firc = apply(ranef_samps_firc, 2, function(x) sd(x + fixef_samps_firc))
   )
+  
+  if (FALSE) {
+    # FIRC model #2 (separate tx/co variances, via lme package)
+    mod_firc2 <- nlme::lme(Yobs ~ 0 + Z + sid, data = dat, random = ~ 0 + Z | sid, 
+                           weights = nlme::varIdent(form = ~ 1 | Z),
+                           na.action=stats::na.exclude,
+                           control=nlme::lmeControl(opt="optim",returnObject=TRUE))
+    
+    res_firc2 <- tibble(
+      sid = as.character(1:J),
+      ATEhat_firc2 = coef(mod_firc2)$Z,
+      SE_firc2 = NA
+      # SE_firc2 = sqrt(diag(vcov(mod_firc)))[-1]   # NO! these are fixed effect SEs...
+    )
+    
+    # ISSUE: it's unclear how to get SEs for the random coefficients (on Z) for a lme object
+    #  - the nlme people don't like them
+    # we could do something like FIRC in lme4 (https://stat.ethz.ch/pipermail/r-sig-mixed-models/2007q3/000248.html), but it'd be a bit of a hassle...
+  }
   
   # RIRC model
   mod_rirc = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )
@@ -299,7 +318,8 @@ run_t_test <- function(df) {
   df %>%
     summarize(t = list(t.test(Y1[Z==1], Y0[Z==0], alternative = "greater"))) %>%
     mutate(ATEhat_single = t[[1]]$estimate["mean of x"] - t[[1]]$estimate["mean of y"],
-           SE_single = t[[1]]$stderr
+           SE_single = t[[1]]$stderr,
+           df_single = t[[1]]$parameter
            # t_single = t[[1]]$statistic,
            # pvalue_single = t[[1]]$p.value
     ) %>%

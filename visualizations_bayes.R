@@ -16,21 +16,19 @@ require(latex2exp)
 # Load simulation results
 #####
 
-# FNAME <- "sim_results_full"
-# fname <- glue("results/", FNAME, ".csv")
-# hits <- read_csv(fname) %>%
-#   mutate(nbar = as.factor(nbar),
-#          J = as.factor(J),
-#          ICC = as.factor(ICC),
-#          tau = as.factor(tau))
-
 source("preprocess_cluster_results.R")
+ALPHA <- 0.1
 
 hits <- res %>%
   mutate(nbar = as.factor(nbar),
          J = as.factor(J),
          ICC = as.factor(ICC),
          tau = as.factor(tau))
+
+if ("df_single" %in% colnames(hits)) {
+  df_key <- hits %>%
+    select(nbar, J, ICC, tau, tx_var, runID, sid, df_single)
+}
 
 # Get ATEs per method (long data)
 ATEhats <- hits %>%
@@ -52,26 +50,36 @@ SEs <- hits %>%
   filter(method %in% c("single", "firc", "rirc", "bayesnorm"))
 
 # join data
-tidy_results <- ATEhats %>%
-  cbind(SE = SEs$SE) %>%
-  # left_join(SEs, by=c("nbar", "J", "ICC", "tau", "tx_var", "runID", "sid", "method")) %>%
-  mutate(pvalue_one = pnorm(-ATEhat/SE),
-         method = ifelse(method == "single", "Single",
-                         ifelse(method == "firc", "FIRC",
-                                ifelse(method == "rirc", "RIRC", "Bayes")))) %>%
-  ungroup()
+if (exists("df_key")) {
+  tidy_results <- ATEhats %>%
+    cbind(SE = SEs$SE) %>%
+    # left_join(SEs, by=c("nbar", "J", "ICC", "tau", "tx_var", "runID", "sid", "method")) %>%
+    left_join(df_key, by=c("nbar", "J", "ICC", "tau", "tx_var", "runID", "sid")) %>%
+    mutate(pvalue_one = ifelse(method == "single", pt(-ATEhat/SE, df=df_single), pnorm(-ATEhat/SE)),
+           interval = ifelse(method == "single", qt(1-ALPHA/2, df=df_single)*SE, qnorm(1-ALPHA/2)*SE),
+           covered = (ATE <= ATEhat+interval) & (ATE >= ATEhat-interval),
+           method = ifelse(method == "single", "Single",
+                           ifelse(method == "firc", "FIRC",
+                                  ifelse(method == "rirc", "RIRC", "Bayes")))) %>%
+    select(-df_single) %>%
+    ungroup()
+} else {
+  tidy_results <- ATEhats %>%
+    cbind(SE = SEs$SE) %>%
+    mutate(pvalue_one = pnorm(-ATEhat/SE),
+           interval = qnorm(1-ALPHA/2)*SE,
+           covered = (ATE <= ATEhat+interval) & (ATE >= ATEhat-interval),
+           method = ifelse(method == "single", "Single",
+                           ifelse(method == "firc", "FIRC",
+                                  ifelse(method == "rirc", "RIRC", "Bayes")))) %>%
+    ungroup()
+}
+
 
 rm(res)
 # rm(hits)
 rm(ATEhats)
 rm(SEs)
-
-
-#####
-# Global settings
-#####
-
-ALPHA <- 0.1
 
 
 #####
@@ -91,9 +99,9 @@ tidy_results %>%
 
 # plot coverage vs. ATE size
 tidy_results %>%
-  # filter(tau == 0, J == 300) %>%
-  mutate(interval = qnorm(1-ALPHA/2)*SE,
-         covered = (ATE <= ATEhat+interval) & (ATE >= ATEhat-interval)) %>%
+  # filter(tau == 0) %>%
+  # filter(J != 20, tau == 0) %>%
+  filter(method != "Single", tau == 0) %>%
   group_by(nbar, J, ICC, tau, tx_var, method, ATE) %>%
   summarize(coverage = mean(covered)) %>%
   filter(ATE >= as.numeric(as.character(tau)) - 1,
@@ -106,13 +114,12 @@ tidy_results %>%
        y = "Coverage",
        x = "True site ATE",
        color = "Method")
-# ggsave(glue("writeup/images/coverage_plot.png"), width=200, height=75, units="mm")
+# ggsave(glue("writeup/images/coverage_plot.png"), width=200, height=125, units="mm")
 
 # plot EB coverage
 tidy_results %>%
   # filter(tau == 0) %>%
-  mutate(interval = qnorm(1-ALPHA/2)*SE,
-         covered = (ATE <= ATEhat+interval) & (ATE >= ATEhat-interval)) %>%
+  filter(method != "Single") %>%
   group_by(nbar, J, ICC, tau, tx_var, method) %>%
   summarize(coverage = mean(covered)) %>%
   ggplot(aes(x=nbar, y=coverage, color=method)) +
@@ -130,16 +137,40 @@ tidy_results %>%
 J_plot <- 300
 
 # Plot power vs. ATE size, for a specified true tau and ICC
-tidy_results %>%
-  # filter(J == J_plot) %>%
+power_df <- tidy_results %>%
+  filter(J == J_plot) %>%
   mutate(reject = pvalue_one < ALPHA) %>%
   group_by(nbar, J, ICC, tau, tx_var, method, ATE) %>%
-  summarize(power = mean(reject)) %>%
+  summarize(power = mean(reject))
+power_df %>%
   ggplot(aes(x = ATE, y = power, col = method, group=method ) ) +
   facet_grid(tau ~ nbar, labeller=label_both ) +
   geom_line(alpha = 0.7) +
   geom_hline( yintercept = 0.8, lty = "dashed" ) +
   geom_hline( yintercept = ALPHA, lty = "dashed" ) +
+  geom_vline( xintercept = 0 ) +
+  coord_cartesian(xlim = c(-0.5, 0.6)) +
+  labs(title = glue("Power (\u03B1 = {ALPHA}) vs. true site effect"),
+       subtitle = glue("J = {J_plot}"),
+       y = "Power",
+       x = "Site-level ATE",
+       color = "Method")
+# ggsave(glue("writeup/images/power_plot_J300.png"), width=200, height=125, units="mm")
+
+# Plot power gaps
+power_df_single <- power_df %>%
+  filter(method == "Single") %>%
+  rename(power_single = power) %>%
+  ungroup() %>%
+  select(-method)
+
+power_df %>%
+  left_join(power_df_single, by=c("nbar", "J", "ICC", "tau", "tx_var", "ATE")) %>%
+  mutate(power_gap = power - power_single) %>%
+  ggplot(aes(x = ATE, y = power_gap, col = method, group=method ) ) +
+  facet_grid(tau ~ nbar, labeller=label_both ) +
+  geom_line(alpha = 0.7) +
+  geom_hline( yintercept = 0) +
   geom_vline( xintercept = 0 ) +
   coord_cartesian(xlim = c(-0.5, 1)) +
   labs(title = glue("Power (\u03B1 = {ALPHA}) vs. true site effect"),
@@ -147,89 +178,68 @@ tidy_results %>%
        y = "Power",
        x = "Site-level ATE",
        color = "Method")
-# ggsave(glue("writeup/images/power_plot_J{J_plot}.png"), width=200, height=125, units="mm")
+# ggsave(glue("writeup/images/power_plot_J300_diff.png"), width=200, height=125, units="mm")
+
 
 ### FOR POWER ANALYSIS EXAMPLE
 
+ALPHA <- 0.1
 tidy_results %>%
   mutate(nbar = as.numeric(as.character(nbar))) %>%
-  # filter(J == J_plot) %>%
-  mutate(reject = pvalue_one < ALPHA) %>%
+  filter(round(ATE, 2) %in% c(0.2, 0.3, 0.4)) %>%
+  mutate(reject = pvalue_one < ALPHA,
+         ATE = as.factor(ATE)) %>%
   group_by(nbar, J, ICC, tau, tx_var, method, ATE) %>%
   summarize(power = mean(reject)) %>%
-  ggplot(aes(x = ATE, y = power, col = nbar, group=nbar ) ) +
-  facet_grid(~ method, labeller=label_both ) +
+ggplot(aes(x = nbar, y = power, col = method, group=method ) ) +
+  facet_grid(~ ATE, labeller=label_both ) +
   geom_line(alpha = 0.7) +
   geom_hline( yintercept = 0.8, lty = "dashed" ) +
-  geom_hline( yintercept = ALPHA, lty = "dashed" ) +
-  geom_vline( xintercept = 0 ) +
-  coord_cartesian(xlim = c(-0.5, 1)) +
-  labs(title = glue("Power (\u03B1 = {ALPHA}) vs. true site effect"),
+  labs(title = glue("Power (\u03B1 = {ALPHA}) vs. site size"),
+       subtitle = "Overall average effect: 0.2",
        y = "Power",
-       x = "Site-level ATE",
-       color = "Average \nsite site")
+       x = "Site size",
+       color = "Method")
 ggsave(glue("writeup/images/power_plot_ex.png"), width=200, height=75, units="mm")
 
-tidy_results %>%
-  filter(nbar %in% c(100, 200, 300)) %>%
-  mutate(reject = pvalue_one < ALPHA) %>%
-  group_by(nbar, J, ICC, tau, tx_var, method, ATE) %>%
-  summarize(power = mean(reject)) %>%
-  ggplot(aes(x = ATE, y = power, col = method, group=method ) ) +
-  facet_grid(tau ~ nbar, labeller=label_both ) +
-  geom_line(alpha = 0.7) +
-  geom_hline( yintercept = 0.8, lty = "dashed" ) +
-  geom_hline( yintercept = ALPHA, lty = "dashed" ) +
-  geom_vline( xintercept = 0 ) +
-  coord_cartesian(xlim = c(-0.5, 1)) +
-  labs(title = glue("Power (\u03B1 = {ALPHA}) vs. true site effect"),
-       y = "Power",
-       x = "Site-level ATE",
-       color = "Method")
-ggsave(glue("writeup/images/power_plot_ex2.png"), width=200, height=75, units="mm")
 
 #####
 # visualizing power for sites with ATE=0.2
 #####
 
+ATE_of_interest <- 0.3
+
 # for sites with ATE=0.2, plot power (across sim settings)
-circ20 <- tidy_results %>% 
-  filter( ATE == 0.2 ) %>%
+circ <- tidy_results %>% 
+  filter( abs(ATE-ATE_of_interest) < 0.01 ) %>%
   group_by( tau, nbar, J, ICC, tx_var, method ) %>%
   summarise( n = n(),
              power = mean( pvalue_one <= ALPHA ) )
 
-# ggplot( circ20, aes( x=tau, y=power, col=method, group=method ) ) +
-#   geom_point(aes(pch = J)) +
-#   geom_line(aes(group=interaction(J, method))) +
-#   geom_hline(yintercept=1-ALPHA, lty="dashed") +
-#   facet_grid(ICC~nbar, labeller=label_both) +
-#   labs( title = glue("Power (\u03B1 = {ALPHA}) to detect a site with ATE=0.2"), 
-#         x = "tau" )
-
-circ20 %>%
+circ %>%
   filter(J == 300) %>%
   ggplot( aes( x=nbar, y=power, col=method, group=method ) ) +
   geom_point() +
   geom_line(aes(group=method)) +
   geom_hline(yintercept=1-ALPHA, lty="dashed") +
   facet_grid(~ tau, labeller=label_both) +
-  labs( title = glue("Power (\u03B1 = {ALPHA}) to detect a site with ATE=0.2"), 
+  labs( title = glue("Power (\u03B1 = {ALPHA}) to detect a site with ATE={ATE_of_interest}"), 
         x = "nbar" )
-ggsave("writeup/images/power_plot_ATE02.png", width=200, height=75, units="mm")
+ggsave("writeup/images/power_plot_ATE03.png", width=200, height=75, units="mm")
 
 # for sites with ATE=0.2, plot estimated ATEs (across sim settings)
 #  - note: # of sites with ATE=0.2 depends on J and tau
 tidy_results %>%
-  filter(ATE == 0.2) %>%
+  filter(abs(ATE-ATE_of_interest) < 0.01) %>%
   filter(J == 300) %>%
   ggplot( aes( x=ATEhat ) ) +
   geom_density(aes(color=method, group=method), 
                position="identity", fill="transparent") +
   geom_vline( xintercept = 0.2, col="red" ) +
+  coord_cartesian(xlim = c(-1, 1)) +
   facet_grid( tau ~ nbar, labeller = label_both ) +
-  labs(title = "Estimated ATEs for sites with ATE=0.2")
-ggsave("writeup/images/power_plot_ATE02_dens.png", width=200, height=100, units="mm")
+  labs(title = glue("Estimated ATEs for sites with ATE={ATE_of_interest}"))
+ggsave("writeup/images/power_plot_ATE03_dens.png", width=200, height=100, units="mm")
 
 
 #####
@@ -238,6 +248,7 @@ ggsave("writeup/images/power_plot_ATE02_dens.png", width=200, height=100, units=
 
 # boxplots of RMSE values
 tidy_results %>%
+  mutate(method = factor(method, levels=c("Single", "Bayes", "FIRC", "RIRC"))) %>%
   # filter(tau == 0) %>%
   group_by(nbar, J, ICC, tau, tx_var, method, runID) %>%
   summarize(rmse = sqrt(mean((ATE - ATEhat)^2))) %>%
@@ -247,7 +258,7 @@ tidy_results %>%
   labs(y = "RMSE",
        x = "Method") +
   guides(color = "none")
-# ggsave("writeup/images/rmse_plot.png", width=200, height=150, units="mm")
+ggsave("writeup/images/rmse_plot.png", width=200, height=150, units="mm")
 
 
 
@@ -305,14 +316,14 @@ res_overall %>%
   mutate(pvalue_one = pnorm(-ATEhat/SE)) %>%
   group_by(nbar, J, ICC, tau, tx_var, method) %>%
   summarize(power = mean(pvalue_one < ALPHA)) %>%
-  ggplot(aes(x=nbar, y=power, color=method)) +
+ggplot(aes(x=nbar, y=power, color=method)) +
   geom_point(aes(group=method)) +
   geom_line() +
   geom_hline(aes(yintercept = 0.8), lty = "dashed") +
   labs(y = "Power",
        x = "Average site size",
        color = "Method")
-ggsave(glue("writeup/images/power_plot_overall.png"), width=200, height=75, units="mm")
+ggsave(glue("writeup/images/power_plot_overall_tau02.png"), width=200, height=75, units="mm")
 
 res_overall %>%
   filter(method != "Single") %>%
@@ -327,5 +338,5 @@ res_overall %>%
   labs(y = "Coverage",
        x = "Average site size",
        color = "Method")
-ggsave(glue("writeup/images/coverage_plot_overall.png"), width=200, height=75, units="mm")
+ggsave(glue("writeup/images/coverage_plot_overall_tau02.png"), width=200, height=75, units="mm")
 
