@@ -1,4 +1,8 @@
 
+
+QUANTILES <- c(0.05, 0.1, 0.95)
+
+
 #####
 # main simulation functions
 #####
@@ -33,118 +37,97 @@ one_sim <- function(nbar, J, tau, ICC, tx_var,
     mutate(sid = as.character(1:n()),
            beta.1 = round(beta.1/round_sites) * round_sites)
   head(sdat)
-  
+
   # Note: generate_individual_data() is not in CRAN version of package
   # dat = blkvar::generate_individual_data( sdat )
   dat = generate_individual_data(sdat,
                                  sigma2.e = 1-ICC)   # need to specify this! or else sigma2.e = 1...
   head( dat )
   
-  
-  # browser()
-  
   ##### run models #####
+  
+  NAME_VEC <- c("ATEhat", "SE", paste0("q", QUANTILES))
   
   ### run single-site models
   
   res_single <- dat %>%
     group_by(sid) %>%
-    dplyr::group_modify(~run_t_test(.)) %>%
+    dplyr::group_modify(~run_t_test(., NAME_VEC)) %>%
     ungroup() %>%
     mutate(sid = as.character(sid))
   
   ### run frequentist multilevel models (FIRC and RIRC)
   
-  # FIRC model #1 (pooled variances, via lmer and arm packages)
-  #  - note: no intercept, so site #1 is what the "intercept" would be
+  # FIRC model #1 (via generic arm package functions)
   mod_firc = lmer( Yobs ~ 0 + as.factor(sid) + Z + (0+Z|sid), data=dat)
+  
+  ATEhat_firc <- coef(mod_firc)$sid$Z
+  SE_firc1 <- sqrt(se.fixef(mod_firc)["Z"]^2 + se.ranef(mod_firc)$sid[,"Z"]^2)
+  
+  res_firc1 <- tibble(sid = as.character(1:J),
+                      ATEhat = ATEhat_firc,
+                      SE = SE_firc1) %>%
+    rowwise() %>%
+    mutate(q = list(ATEhat + qnorm(QUANTILES) * SE)) %>%
+    unnest(cols = q) %>%
+    group_by(sid) %>%
+    mutate(quantile = QUANTILES) %>%
+    ungroup() %>%
+    pivot_wider(names_from = quantile, values_from = q, names_prefix = "q")
+  names(res_firc1) <- c("sid", paste0(NAME_VEC, "_firc1"))
+  
+  # FIRC model #2 (via arm package sampling functions)
   
   # grabbing arm package samples
   sim_firc <- sim(mod_firc, n.sims = NUMSAMP)
   fixef_samps_firc <- coef(sim_firc)[["fixef"]][,"Z"]
   ranef_samps_firc <- coef(sim_firc)[["ranef"]]$sid[,,"Z"]
   
-  res_firc <- tibble(
+  res_firc2 <- tibble(
     sid = as.character(1:J),
-    ATEhat_firc = coef(mod_firc)$sid$Z,
-    SE_firc_fixed = se.fixef(mod_firc)["Z"],
-    SE_firc_rand = se.ranef(mod_firc)$sid[,"Z"],
-    SE_firc = apply(ranef_samps_firc, 2, function(x) sd(x + fixef_samps_firc))
-  )
+    ATEhat = ATEhat_firc,
+    SE = apply(ranef_samps_firc, 2, function(x) sd(x + fixef_samps_firc))
+  ) %>%
+    cbind(t(apply(ranef_samps_firc, 2, 
+                  function(x) quantile(x + fixef_samps_firc, probs=QUANTILES)))) %>%
+    as_tibble(.name_repair = "minimal")
+  names(res_firc2) <- c("sid", paste0(NAME_VEC, "_firc2"))
   
-  if (FALSE) {
-    # FIRC model #2 (separate tx/co variances, via lme package)
-    mod_firc2 <- nlme::lme(Yobs ~ 0 + Z + sid, data = dat, random = ~ 0 + Z | sid, 
-                           weights = nlme::varIdent(form = ~ 1 | Z),
-                           na.action=stats::na.exclude,
-                           control=nlme::lmeControl(opt="optim",returnObject=TRUE))
-    
-    res_firc2 <- tibble(
-      sid = as.character(1:J),
-      ATEhat_firc2 = coef(mod_firc2)$Z,
-      SE_firc2 = NA
-      # SE_firc2 = sqrt(diag(vcov(mod_firc)))[-1]   # NO! these are fixed effect SEs...
-    )
-    
-    # ISSUE: it's unclear how to get SEs for the random coefficients (on Z) for a lme object
-    #  - the nlme people don't like them
-    # we could do something like FIRC in lme4 (https://stat.ethz.ch/pipermail/r-sig-mixed-models/2007q3/000248.html), but it'd be a bit of a hassle...
-  }
-  
-  # RIRC model
+  # RIRC model #1 (via generic arm package functions)
   mod_rirc = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )
+  
+  ATEhat_rirc <- coef(mod_rirc)$sid$Z
+  SE_rirc1 <- sqrt(se.fixef(mod_rirc)["Z"]^2 + se.ranef(mod_rirc)$sid[,"Z"]^2)
+  
+  res_rirc1 <- tibble(sid = as.character(1:J),
+                      ATEhat = ATEhat_rirc,
+                      SE = SE_rirc1) %>%
+    rowwise() %>%
+    mutate(q = list(ATEhat + qnorm(QUANTILES) * SE)) %>%
+    unnest(cols = q) %>%
+    group_by(sid) %>%
+    mutate(quantile = QUANTILES) %>%
+    ungroup() %>%
+    pivot_wider(names_from = quantile, values_from = q, 
+                names_prefix = "q")
+  names(res_rirc1) <- c("sid", paste0(NAME_VEC, "_rirc1"))
+  
+  # RIRC model #2 (via arm package sampling functions)
   
   # grabbing arm package samples
   sim_rirc <- sim(mod_rirc, n.sims = NUMSAMP)
   fixef_samps_rirc <- coef(sim_rirc)[["fixef"]][,"Z"]
   ranef_samps_rirc <- coef(sim_rirc)[["ranef"]]$sid[,,"Z"]
   
-  res_rirc <- tibble(
+  res_rirc2 <- tibble(
     sid = as.character(1:J),
-    ATEhat_rirc = coef(mod_rirc)$sid$Z,
-    SE_rirc_fixed = se.fixef(mod_rirc)["Z"],
-    SE_rirc_rand = se.ranef(mod_rirc)$sid[,"Z"],
-    SE_rirc = apply(ranef_samps_rirc, 2, function(x) sd(x + fixef_samps_rirc))
-  )
-  
-  # figuring out what se.fixef/se.ranef are giving
-  if (FALSE) {
-    # NOTE: sd of RIRC random effects columns is super small for some reason... definitely doesn't match what se.ranef() is giving!
-    
-    # see https://stats.stackexchange.com/questions/68106/understanding-the-variance-of-random-effects-in-lmer-models for some comments here
-    
-    # se.ranef uses:
-    sqrt(attr( ranef( mod_firc, condVar = TRUE )[[1]], "postVar" ))
-    se.ranef(mod_firc)
-    #  this is square root of the "conditional variance-covariance matrices of the random effects"
-    #   - random effects shouldn't have covariances, right? so it's a diagonal matrix
-    #   - what does the "conditional" piece mean?
-    
-    # using the model built-in function gives lower standard errors...?
-    #  - worse for lower standard errors (larger sites)...
-    tibble(
-      # using_samples = apply(coef(sim_firc)[["ranef"]]$sid[,,"Z"], 2, function(x) sd(x + coef(sim_firc)[["fixef"]][,"Z"])),   # our actual standard errors that we want!
-      using_samples = apply(coef(sim_firc)[["ranef"]]$sid[,,"Z"], 2, sd),
-      # using_model = se.ranef(mod_firc)$sid[,"Z"]
-      using_model = se.ranef(mod_firc)$sid[,"Z"] + se.fixef(mod_firc)["Z"]
-    ) %>%
-      ggplot() +
-      geom_point(aes(x=using_model, y=using_samples)) +
-      geom_abline() +
-      coord_cartesian(xlim = c(0.05, 0.25), ylim = c(0.1, 0.3))
-    
-    # Q: how to recover model-function's SEs for random effects?
-    #  - we match exactly for fixed effects
-    #  - we can't recover what se.ranef outputs by using our samples...
-    
-    # the fixed effects have the same standard errors...
-    tibble(using_model = se.fixef(mod_firc),
-           using_samples =   coef(sim_firc)[["fixef"]] %>% apply(., 2, sd)) %>%
-      ggplot() +
-      geom_point(aes(x=using_model, y=using_samples)) +
-      geom_abline()
-  }
-  
+    ATEhat_rirc2 = ATEhat_rirc,
+    SE_rirc2 = apply(ranef_samps_rirc, 2, function(x) sd(x + fixef_samps_rirc))
+  ) %>%
+    cbind(t(apply(ranef_samps_rirc, 2, 
+                  function(x) quantile(x + fixef_samps_rirc, probs=QUANTILES)))) %>%
+    as_tibble(.name_repair = "minimal")
+  names(res_rirc2) <- c("sid", paste0(NAME_VEC, "_rirc2"))
   
   ### run bayesian multilevel models
   
@@ -164,6 +147,16 @@ one_sim <- function(nbar, J, tau, ICC, tx_var,
                             model_name = "norm",
                             auto_write = T)
   }
+  
+  fit_norm <- sampling(mod_norm,
+                       data = stan_list,
+                       iter = NUMSAMP,
+                       chains = 4,
+                       control = list(max_treedepth = 12,
+                                      adapt_delta = 0.95),
+                       verbose = F, 
+                       show_messages = F, 
+                       refresh = 0)
   
   # wrap in error detection
   num_divergences <- 0
@@ -201,6 +194,8 @@ one_sim <- function(nbar, J, tau, ICC, tx_var,
   samples_norm <- rstan::extract(fit_norm)
   names(samples_norm)
   
+  # browser()
+  
   # get site-effect estimates from samples
   site_effects_norm <- samples_norm$site_mn
   if (FALSE) {
@@ -214,32 +209,39 @@ one_sim <- function(nbar, J, tau, ICC, tx_var,
   res_bayesnorm <- tibble(
     sid = as.character(1:J),
     ATEhat_bayesnorm = apply(site_effects_norm, 2, mean),
-    SE_bayesnorm = apply(site_effects_norm, 2, sd))
-  
+    SE_bayesnorm = apply(site_effects_norm, 2, sd)) %>%
+    cbind(t(apply(site_effects_norm, 2, 
+                  function(x) quantile(x, probs=QUANTILES)))) %>%
+    as_tibble(.name_repair = "minimal")
+  names(res_bayesnorm) <- c("sid", paste0(NAME_VEC, "_bayesnorm"))
   
   ##### compile results #####
   
-  # compile results for overall tau
-  mod_pooled <- lm(Yobs ~ 0 + as.factor(sid) + Z, data=dat)   # use pooled model
-  res_overall <- tibble(
-    method = c("FIRC", "RIRC", "Bayes", "Single"),
-    ATEhat = c(fixef(mod_firc)["Z"], fixef(mod_rirc)["Z"], 
-               mean(samples_norm$pop_mn), coef(mod_pooled)["Z"]),
-    SE     = c(se.fixef(mod_firc)["Z"], se.fixef(mod_rirc)["Z"], 
-               sd(samples_norm$pop_mn), summary(mod_pooled)$coef["Z",2]))
+  # # compile results for overall tau
+  # mod_pooled <- lm(Yobs ~ 0 + as.factor(sid) + Z, data=dat)   # use pooled model
+  # res_overall <- tibble(
+  #   method = c("FIRC", "RIRC", "Bayes", "Single"),
+  #   ATEhat = c(fixef(mod_firc)["Z"], fixef(mod_rirc)["Z"],
+  #              mean(samples_norm$pop_mn), coef(mod_pooled)["Z"]),
+  #   SE     = c(se.fixef(mod_firc)["Z"], se.fixef(mod_rirc)["Z"],
+  #              sd(samples_norm$pop_mn), summary(mod_pooled)$coef["Z",2]))
   
   # compile results for single-site tau_js
+  
   res_sites <- as_tibble(sdat) %>%
     dplyr::select(sid, n, ATE = beta.1) %>%
     left_join(res_single, by="sid") %>%
-    left_join(res_firc, by="sid") %>%
-    left_join(res_rirc, by="sid") %>%
+    left_join(res_firc1, by="sid") %>%
+    left_join(res_firc2, by="sid") %>%
+    left_join(res_rirc1, by="sid") %>%
+    left_join(res_rirc2, by="sid") %>%
     left_join(res_bayesnorm, by="sid") %>%
     mutate(is_singular_firc = isSingular(mod_firc), # is FIRC model singular?
            is_singular_rirc = isSingular(mod_rirc), # is RIRC model singular?
            ESS_low = more_samples)                  # low ESS warning from rstan?
   
-  return(list(overall = res_overall, sites = res_sites))
+  # return(list(overall = res_overall, sites = res_sites))
+  return(res_sites)
 }
 
 
@@ -313,22 +315,35 @@ if ( F ) {
 #####
 
 # given a df for a single site, run a one-sided t-test
-run_t_test <- function(df) {
+run_t_test <- function(df, NAME_VEC = NAME_VEC) {
+
+  # df %>%
+  #   summarize(t = list(t.test(Y1[Z==1], Y0[Z==0]))) %>%
+  #   mutate(ATEhat_single = t[[1]]$estimate["mean of x"] - t[[1]]$estimate["mean of y"],
+  #          SE_single = t[[1]]$stderr,     # standard SE, but of a t dist.
+  #          df_single = t[[1]]$parameter   # df of the t distribution
+  #   ) %>%
+  #   dplyr::select(-t)
   
-  df %>%
-    summarize(t = list(t.test(Y1[Z==1], Y0[Z==0], alternative = "greater"))) %>%
-    mutate(ATEhat_single = t[[1]]$estimate["mean of x"] - t[[1]]$estimate["mean of y"],
-           SE_single = t[[1]]$stderr,
-           df_single = t[[1]]$parameter
-           # t_single = t[[1]]$statistic,
-           # pvalue_single = t[[1]]$p.value
-    ) %>%
-    dplyr::select(-t)
+  t_test <- with(df, t.test(Y1[Z==1], Y0[Z==1]))
+  
+  ATEhat_single <- t_test$estimate["mean of x"] - t_test$estimate["mean of y"]
+  SE_single     <- t_test$stderr
+  df_single     <- t_test$parameter
+  quants        <- ATEhat_single + qt(QUANTILES, df=df_single) * SE_single
+  
+  res <- c(ATEhat_single, SE_single, quants) %>%
+    t() %>%
+    as_tibble(.name_repair = "minimal")
+  names(res) <- paste0(NAME_VEC, "_single")
+  
+  return(res)
 }
 
 # given the full df with individual observations,
 # make df with site-level summaries for rstan functions
 make_site_summaries <- function( df ) {
+
   df %>%
     group_by(sid, Z) %>%
     summarize(ybar = mean(Yobs),

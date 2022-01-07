@@ -47,15 +47,22 @@ if (PARALLEL) {
 #####
 
 # simulation settings
-NUMSIM <- 10
+NUMSIM <- 5
 df_sim <- expand_grid(
-  # nbar   = seq(25, 300, by=25),
-  nbar   = c(10, 25, 100, 300),
-  J      = c(10, 25, 100, 300),
+  nbar   = c(50, 100, 250),
+  # J      = c(5, 10, 25, 50, 100),
+  J      = c(25),
   ICC    = c(0.2),
   tau    = c(0, 0.2, 0.5),
-  tx_var = c(0.3)
+  tx_var = c(0.05^2, 0.1^2, 0.3^2)
 )
+# df_sim <- expand_grid(
+#   nbar = 25,
+#   J = 25,
+#   ICC = 0.2,
+#   tau = 0,
+#   tx_var = 0.3^2
+# )
 
 if (PARALLEL) {
   tic()
@@ -86,22 +93,23 @@ if (PARALLEL) {
 } else {
   # run simulation: store power_sim() results in df_sim as list column
   tic()
-  df_sim <- df_sim %>%
+  sim <- df_sim %>%
     rowwise() %>%
     mutate(data = list(power_sim(nbar, J, tau, ICC, tx_var, 
                                  variable.n = T,   # vary site sizes!
                                  NUMSIM = NUMSIM, 
-                                 WRITE_CSV = F)))
-  # aggregate site-level results
-  sim_sites <- df_sim %>%
-    unnest(cols = data) %>%
-    filter(names(data) == "sites") %>%
+                                 WRITE_CSV = F))) %>%
     unnest(cols = data)
-  # aggregate overall results
-  sim_overall <- df_sim %>%
-    unnest(cols = data) %>%
-    filter(names(data) == "overall") %>%
-    unnest(cols = data)
+  # # aggregate site-level results
+  # sim_sites <- df_sim %>%
+  #   unnest(cols = data) %>%
+  #   filter(names(data) == "sites") %>%
+  #   unnest(cols = data)
+  # # aggregate overall results
+  # sim_overall <- df_sim %>%
+  #   unnest(cols = data) %>%
+  #   filter(names(data) == "overall") %>%
+  #   unnest(cols = data)
   toc()
 }
 
@@ -110,36 +118,35 @@ if (PARALLEL) {
 # save results
 #####
 
-# FNAME <- "sim_ex_tau02"
-FNAME <- "final_sim"
+FNAME <- "revised_sim"
 UUID  <- substr(UUIDgenerate(), 25, 36)
 
 # save site-level results
-fname_sites <- glue("results/{FNAME}-{UUID}.csv")
-if (file.exists(fname_sites)) {
+fname <- glue("revised_results/{FNAME}-{UUID}.csv")
+if (file.exists(fname)) {
   # ASSUMING that all sim settings are run equally
-  max_runID <- read_csv(fname_sites) %>%
+  max_runID <- read_csv(fname) %>%
     pull(runID) %>%
     max()
 
-  sim_sites %>%
+  sim %>%
     mutate(runID = runID + max_runID) %>%
-    write_csv(fname_sites, append=T)
+    write_csv(fname, append=T)
 } else {
-  write_csv(sim_sites, fname_sites)
+  write_csv(sim, fname)
 }
 
-# save overall results
-fname_overall <- glue("results/{FNAME}_overall-{UUID}.csv")
-if (file.exists(fname_overall)) {
-  # ASSUMING that all sim settings are run equally
-  max_runID <- read_csv(fname_overall) %>%
-    pull(runID) %>%
-    max()
-  
-  sim_overall %>%
-    mutate(runID = runID + max_runID) %>%
-    write_csv(fname_overall, append=T)
-} else {
-  write_csv(sim_overall, fname_overall)
-}
+# # save overall results
+# fname_overall <- glue("results/{FNAME}_overall-{UUID}.csv")
+# if (file.exists(fname_overall)) {
+#   # ASSUMING that all sim settings are run equally
+#   max_runID <- read_csv(fname_overall) %>%
+#     pull(runID) %>%
+#     max()
+#   
+#   sim_overall %>%
+#     mutate(runID = runID + max_runID) %>%
+#     write_csv(fname_overall, append=T)
+# } else {
+#   write_csv(sim_overall, fname_overall)
+# }
