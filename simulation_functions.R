@@ -16,17 +16,27 @@ QUANTILES <- c(0.05, 0.1, 0.95)
 #' @param ICC 
 #'
 #' @return tibble with J rows
-one_sim <- function(nbar, J, tau, ICC, tx_var, 
+one_sim <- function(nbar, J, tau, ICC, tx_sd, 
                     variable.n = F,
-                    round_sites = 0.05, 
+                    round_sites = 0.05,
+                    # round_sites = round(tx_sd*4/20, 3),   # 20 bins for +/- 2 sd
                     NUMSAMP = 2000) {
+  
+  # if tx_sd is very small, set smaller bins!
+  if (tx_sd <= 0.1) {
+    round_sites <- 0.02
+    if (tx_sd <= 0.05) {
+      round_sites <- 0.01
+    }
+  }
+  print(glue("Using bin size of {round_sites}"))
   
   ##### simulate data #####
   
   sdat = blkvar::generate_multilevel_data( n.bar = nbar, 
                                            J = J,
                                            variable.n = variable.n,
-                                           tau.11.star = tx_var,   # cross-site tx var
+                                           tau.11.star = tx_sd^2,   # cross-site tx var
                                            gamma.10 = tau,      # cross-site ATE
                                            ICC = ICC,           # ICC [really var(intercepts)]
                                            rho2.0W = 0,         # covariate has no explanatory power 
@@ -217,17 +227,18 @@ one_sim <- function(nbar, J, tau, ICC, tx_var,
   
   ##### compile results #####
   
-  # # compile results for overall tau
-  # mod_pooled <- lm(Yobs ~ 0 + as.factor(sid) + Z, data=dat)   # use pooled model
-  # res_overall <- tibble(
-  #   method = c("FIRC", "RIRC", "Bayes", "Single"),
-  #   ATEhat = c(fixef(mod_firc)["Z"], fixef(mod_rirc)["Z"],
-  #              mean(samples_norm$pop_mn), coef(mod_pooled)["Z"]),
-  #   SE     = c(se.fixef(mod_firc)["Z"], se.fixef(mod_rirc)["Z"],
-  #              sd(samples_norm$pop_mn), summary(mod_pooled)$coef["Z",2]))
+  # compile results for overall tau
+  mod_pooled <- lm(Yobs ~ 0 + as.factor(sid) + Z, data=dat)   # use pooled model
+  res_overall <- tibble(
+    method = c("FIRC", "RIRC", "Bayes", "Single"),
+    ATEhat = c(fixef(mod_firc)["Z"], fixef(mod_rirc)["Z"],
+               mean(samples_norm$pop_mn), coef(mod_pooled)["Z"]),
+    SE     = c(se.fixef(mod_firc)["Z"], se.fixef(mod_rirc)["Z"],
+               sd(samples_norm$pop_mn), summary(mod_pooled)$coef["Z",2]))
+  
+  # browser()
   
   # compile results for single-site tau_js
-  
   res_sites <- as_tibble(sdat) %>%
     dplyr::select(sid, n, ATE = beta.1) %>%
     left_join(res_single, by="sid") %>%
@@ -240,13 +251,13 @@ one_sim <- function(nbar, J, tau, ICC, tx_var,
            is_singular_rirc = isSingular(mod_rirc), # is RIRC model singular?
            ESS_low = more_samples)                  # low ESS warning from rstan?
   
-  # return(list(overall = res_overall, sites = res_sites))
-  return(res_sites)
+  return(list(overall = res_overall, sites = res_sites))
+  # return(res_sites)
 }
 
 
 if ( F ) {
-  os <- one_sim( n=25, J=50, tau=0.01, ICC=0, tx_var=0.3)
+  os <- one_sim( n=25, J=50, tau=0.01, ICC=0, tx_sd=0.3)
   browser()
   
   ATEhats <- os %>%
@@ -280,19 +291,19 @@ if ( F ) {
 
 # function: (# obs, effect size) => (power)
 #  - runs one_sim NUMSIM times, so we can aggregate across runIDs to get the power
-power_sim <- function(nbar, J, tau, ICC, tx_var, 
+power_sim <- function(nbar, J, tau, ICC, tx_sd, 
                       variable.n = F,
                       NUMSIM = 250, 
                       WRITE_CSV = F, 
                       fname = NULL) {
-  cat(glue("Working on nbar = {nbar}, J = {J}, ICC = {ICC}, tau = {tau}, tx_var = {tx_var}\n\n"))
+  cat(glue("Working on nbar = {nbar}, J = {J}, ICC = {ICC}, tau = {tau}, tx_sd = {tx_sd}\n\n"))
   rs = tibble( runID = 1:NUMSIM )
-  rs$data = map( rs$runID, ~one_sim(nbar, J, tau, ICC, tx_var, variable.n))
+  rs$data = map( rs$runID, ~one_sim(nbar, J, tau, ICC, tx_sd, variable.n))
   rs = unnest( rs, cols = data )
   
   if(WRITE_CSV) {
     hits <- rs %>%
-      mutate(nbar = nbar, J=J, ICC=ICC, tau=tau, tx_var=tx_var,
+      mutate(nbar = nbar, J=J, ICC=ICC, tau=tau, tx_sd=tx_sd,
              .before = 1)
     
     if (!file.exists(fname)) {
@@ -306,7 +317,7 @@ power_sim <- function(nbar, J, tau, ICC, tx_var,
 }
 
 if ( F ) {
-  power_sim( nbar=20, J=20, tau=0.2, ICC=0, tx_var=0, NUMSIM=3 )
+  power_sim( nbar=20, J=20, tau=0.2, ICC=0, tx_sd=0, NUMSIM=3 )
 }
 
 
@@ -325,7 +336,7 @@ run_t_test <- function(df, NAME_VEC = NAME_VEC) {
   #   ) %>%
   #   dplyr::select(-t)
   
-  t_test <- with(df, t.test(Y1[Z==1], Y0[Z==1]))
+  t_test <- with(df, t.test(Y1[Z==1], Y0[Z==0]))
   
   ATEhat_single <- t_test$estimate["mean of x"] - t_test$estimate["mean of y"]
   SE_single     <- t_test$stderr

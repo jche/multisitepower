@@ -47,21 +47,21 @@ if (PARALLEL) {
 #####
 
 # simulation settings
-NUMSIM <- 5
+NUMSIM <- 500   # J * number of simulations = NUMSIM; must be greater than max(J)
 df_sim <- expand_grid(
   nbar   = c(50, 100, 250),
   # J      = c(5, 10, 25, 50, 100),
-  J      = c(25),
+  J      = c(5, 25, 100),
   ICC    = c(0.2),
   tau    = c(0, 0.2, 0.5),
-  tx_var = c(0.05^2, 0.1^2, 0.3^2)
+  tx_sd  = c(0.1, 0.2, 0.3)
 )
 # df_sim <- expand_grid(
 #   nbar = 25,
 #   J = 25,
 #   ICC = 0.2,
 #   tau = 0,
-#   tx_var = 0.3^2
+#   tx_sd = 0.3
 # )
 
 if (PARALLEL) {
@@ -70,7 +70,7 @@ if (PARALLEL) {
                  J   = df_sim$J,
                  ICC = df_sim$ICC,
                  tau = df_sim$tau,
-                 tx_var = df_sim$tx_var,
+                 tx_sd = df_sim$tx_sd,
                  .combine = rbind,
                  .packages=c("blkvar", "tidyverse", "glue", "arm", "rstan")) %dopar% {
                    
@@ -78,11 +78,11 @@ if (PARALLEL) {
                    source("simulation_functions.R")
                    
                    # power_sim
-                   power_sim(nbar=nbar, J=J, ICC=ICC, tau=tau, tx_var=tx_var,
+                   power_sim(nbar=nbar, J=J, ICC=ICC, tau=tau, tx_sd=tx_sd,
                              variable.n = T,   # vary site sizes!
-                             NUMSIM = NUMSIM,
+                             NUMSIM = NUMSIM/J,
                              WRITE_CSV = F) %>%
-                      mutate(nbar = nbar, J=J, ICC=ICC, tau=tau, tx_var=tx_var,
+                      mutate(nbar = nbar, J=J, ICC=ICC, tau=tau, tx_sd=tx_sd,
                              .before = 1)
                  }
   stopCluster(cl = workers)
@@ -95,21 +95,22 @@ if (PARALLEL) {
   tic()
   sim <- df_sim %>%
     rowwise() %>%
-    mutate(data = list(power_sim(nbar, J, tau, ICC, tx_var, 
+    mutate(data = list(power_sim(nbar, J, tau, ICC, tx_sd, 
                                  variable.n = T,   # vary site sizes!
-                                 NUMSIM = NUMSIM, 
-                                 WRITE_CSV = F))) %>%
+                                 NUMSIM = NUMSIM/J, 
+                                 WRITE_CSV = F))) # %>%
+    # unnest(cols = data)
+  
+  # aggregate site-level results
+  sim_sites <- sim %>%
+    unnest(cols = data) %>%
+    filter(names(data) == "sites") %>%
     unnest(cols = data)
-  # # aggregate site-level results
-  # sim_sites <- df_sim %>%
-  #   unnest(cols = data) %>%
-  #   filter(names(data) == "sites") %>%
-  #   unnest(cols = data)
-  # # aggregate overall results
-  # sim_overall <- df_sim %>%
-  #   unnest(cols = data) %>%
-  #   filter(names(data) == "overall") %>%
-  #   unnest(cols = data)
+  # aggregate overall results
+  sim_overall <- sim %>%
+    unnest(cols = data) %>%
+    filter(names(data) == "overall") %>%
+    unnest(cols = data)
   toc()
 }
 
@@ -118,35 +119,37 @@ if (PARALLEL) {
 # save results
 #####
 
-FNAME <- "revised_sim"
+FNAME <- "revised_sim2"
 UUID  <- substr(UUIDgenerate(), 25, 36)
 
 # save site-level results
 fname <- glue("revised_results/{FNAME}-{UUID}.csv")
+# fname <- glue("revised_results/{FNAME}.csv")
 if (file.exists(fname)) {
   # ASSUMING that all sim settings are run equally
   max_runID <- read_csv(fname) %>%
     pull(runID) %>%
     max()
 
-  sim %>%
+  sim_sites %>%
     mutate(runID = runID + max_runID) %>%
     write_csv(fname, append=T)
 } else {
-  write_csv(sim, fname)
+  write_csv(sim_sites, fname)
 }
 
-# # save overall results
-# fname_overall <- glue("results/{FNAME}_overall-{UUID}.csv")
-# if (file.exists(fname_overall)) {
-#   # ASSUMING that all sim settings are run equally
-#   max_runID <- read_csv(fname_overall) %>%
-#     pull(runID) %>%
-#     max()
-#   
-#   sim_overall %>%
-#     mutate(runID = runID + max_runID) %>%
-#     write_csv(fname_overall, append=T)
-# } else {
-#   write_csv(sim_overall, fname_overall)
-# }
+# save overall results
+fname_overall <- glue("revised_results/{FNAME}_overall-{UUID}.csv")
+# fname_overall <- glue("revised_results/{FNAME}_overall.csv")
+if (file.exists(fname_overall)) {
+  # ASSUMING that all sim settings are run equally
+  max_runID <- read_csv(fname_overall) %>%
+    pull(runID) %>%
+    max()
+
+  sim_overall %>%
+    mutate(runID = runID + max_runID) %>%
+    write_csv(fname_overall, append=T)
+} else {
+  write_csv(sim_overall, fname_overall)
+}

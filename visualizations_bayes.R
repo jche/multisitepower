@@ -12,74 +12,82 @@ require(tictoc)
 require(latex2exp)
 
 
+# significance level
+ALPHA <- 0.1
+
+
 #####
 # Load simulation results
 #####
 
-source("preprocess_cluster_results.R")
-ALPHA <- 0.1
+tidy_results <- read_csv("results/sim_results_full.csv")
 
-hits <- res %>%
-  mutate(nbar = as.factor(nbar),
-         J = as.factor(J),
-         ICC = as.factor(ICC),
-         tau = as.factor(tau))
-
-if ("df_single" %in% colnames(hits)) {
-  df_key <- hits %>%
-    select(nbar, J, ICC, tau, tx_var, runID, sid, df_single)
+if (FALSE) {
+  source("preprocess_cluster_results.R")
+  
+  hits <- res %>%
+    mutate(nbar = as.factor(nbar),
+           J = as.factor(J),
+           ICC = as.factor(ICC),
+           tau = as.factor(tau))
+  
+  if ("df_single" %in% colnames(hits)) {
+    df_key <- hits %>%
+      select(nbar, J, ICC, tau, tx_var, runID, sid, df_single)
+  }
+  
+  # Get ATEs per method (long data)
+  ATEhats <- hits %>%
+    group_by(nbar, J, ICC, tau, tx_var, runID) %>%
+    pivot_longer(contains("ATEhat"), names_to = "method", values_to = "ATEhat") %>%
+    select(ATE, sid, method, ATEhat) %>%
+    mutate(method = str_sub(method, 8))
+  
+  # Get SEs per method (long data)
+  SEs <- hits %>%
+    mutate(SE_rirc = SE_rirc_rand,
+           SE_firc = SE_firc_rand) %>%
+    # mutate(SE_rirc = sqrt(SE_rirc_fixed^2 + SE_rirc_rand^2),
+    #        SE_firc = sqrt(SE_firc_fixed^2 + SE_firc_rand^2)) %>%   # using both SEs
+    group_by(nbar, J, ICC, tau, tx_var, runID) %>%
+    pivot_longer(contains("SE_"), names_to = "method", values_to = "SE") %>%
+    select(sid, method, SE) %>%
+    mutate(method = str_sub(method, 4)) %>%
+    filter(method %in% c("single", "firc", "rirc", "bayesnorm"))
+  
+  # join data
+  if (exists("df_key")) {
+    tidy_results <- ATEhats %>%
+      cbind(SE = SEs$SE) %>%
+      # left_join(SEs, by=c("nbar", "J", "ICC", "tau", "tx_var", "runID", "sid", "method")) %>%
+      left_join(df_key, by=c("nbar", "J", "ICC", "tau", "tx_var", "runID", "sid")) %>%
+      mutate(pvalue_one = ifelse(method == "single", pt(-ATEhat/SE, df=df_single), pnorm(-ATEhat/SE)),
+             interval = ifelse(method == "single", qt(1-ALPHA/2, df=df_single)*SE, qnorm(1-ALPHA/2)*SE),
+             covered = (ATE <= ATEhat+interval) & (ATE >= ATEhat-interval),
+             method = ifelse(method == "single", "Single",
+                             ifelse(method == "firc", "FIRC",
+                                    ifelse(method == "rirc", "RIRC", "Bayes")))) %>%
+      select(-df_single) %>%
+      ungroup()
+  } else {
+    tidy_results <- ATEhats %>%
+      cbind(SE = SEs$SE) %>%
+      mutate(pvalue_one = pnorm(-ATEhat/SE),
+             interval = qnorm(1-ALPHA/2)*SE,
+             covered = (ATE <= ATEhat+interval) & (ATE >= ATEhat-interval),
+             method = ifelse(method == "single", "Single",
+                             ifelse(method == "firc", "FIRC",
+                                    ifelse(method == "rirc", "RIRC", "Bayes")))) %>%
+      ungroup()
+  }
+  
+  
+  rm(res)
+  # rm(hits)
+  rm(ATEhats)
+  rm(SEs)
 }
 
-# Get ATEs per method (long data)
-ATEhats <- hits %>%
-  group_by(nbar, J, ICC, tau, tx_var, runID) %>%
-  pivot_longer(contains("ATEhat"), names_to = "method", values_to = "ATEhat") %>%
-  select(ATE, sid, method, ATEhat) %>%
-  mutate(method = str_sub(method, 8))
-
-# Get SEs per method (long data)
-SEs <- hits %>%
-  mutate(SE_rirc = SE_rirc_rand,
-         SE_firc = SE_firc_rand) %>%
-  # mutate(SE_rirc = sqrt(SE_rirc_fixed^2 + SE_rirc_rand^2),
-  #        SE_firc = sqrt(SE_firc_fixed^2 + SE_firc_rand^2)) %>%   # using both SEs
-  group_by(nbar, J, ICC, tau, tx_var, runID) %>%
-  pivot_longer(contains("SE_"), names_to = "method", values_to = "SE") %>%
-  select(sid, method, SE) %>%
-  mutate(method = str_sub(method, 4)) %>%
-  filter(method %in% c("single", "firc", "rirc", "bayesnorm"))
-
-# join data
-if (exists("df_key")) {
-  tidy_results <- ATEhats %>%
-    cbind(SE = SEs$SE) %>%
-    # left_join(SEs, by=c("nbar", "J", "ICC", "tau", "tx_var", "runID", "sid", "method")) %>%
-    left_join(df_key, by=c("nbar", "J", "ICC", "tau", "tx_var", "runID", "sid")) %>%
-    mutate(pvalue_one = ifelse(method == "single", pt(-ATEhat/SE, df=df_single), pnorm(-ATEhat/SE)),
-           interval = ifelse(method == "single", qt(1-ALPHA/2, df=df_single)*SE, qnorm(1-ALPHA/2)*SE),
-           covered = (ATE <= ATEhat+interval) & (ATE >= ATEhat-interval),
-           method = ifelse(method == "single", "Single",
-                           ifelse(method == "firc", "FIRC",
-                                  ifelse(method == "rirc", "RIRC", "Bayes")))) %>%
-    select(-df_single) %>%
-    ungroup()
-} else {
-  tidy_results <- ATEhats %>%
-    cbind(SE = SEs$SE) %>%
-    mutate(pvalue_one = pnorm(-ATEhat/SE),
-           interval = qnorm(1-ALPHA/2)*SE,
-           covered = (ATE <= ATEhat+interval) & (ATE >= ATEhat-interval),
-           method = ifelse(method == "single", "Single",
-                           ifelse(method == "firc", "FIRC",
-                                  ifelse(method == "rirc", "RIRC", "Bayes")))) %>%
-    ungroup()
-}
-
-
-rm(res)
-# rm(hits)
-rm(ATEhats)
-rm(SEs)
 
 
 #####
@@ -118,7 +126,7 @@ tidy_results %>%
 
 # plot EB coverage
 tidy_results %>%
-  # filter(tau == 0) %>%
+  filter(tau == 0) %>%
   filter(method != "Single") %>%
   group_by(nbar, J, ICC, tau, tx_var, method) %>%
   summarize(coverage = mean(covered)) %>%
@@ -128,6 +136,58 @@ tidy_results %>%
   facet_grid( ~ J, labeller=label_both, scales="free") +
   geom_hline(yintercept=1-ALPHA, lty="dashed")
 # ggsave(glue("writeup/images/coverage_plot_eb.png"), width=200, height=75, units="mm")
+
+
+#####
+# visualizing MDES
+#####
+
+# Plot power vs. ATE size, for a specified true tau and ICC
+power_df <- tidy_results %>%
+  mutate(reject = pvalue_one < ALPHA) %>%
+  group_by(nbar, J, ICC, tau, tx_var, method, ATE) %>%
+  summarize(n = n(),
+            power = mean(reject))
+
+# just get simulation settings
+settings_df <- power_df %>%
+  ungroup() %>%
+  group_by(nbar, J, ICC, tau, tx_var, method) %>%
+  summarize() %>%
+  ungroup()
+
+mdes_fun <- function(pow) {
+  # power_df is grouped already
+  mdes_df <- power_df %>%
+    rename(MDES = ATE) %>%
+    mutate(power_level = pow) %>%
+    filter(n >= 10,   # if too few simulations, don't use power estimate
+           power >= pow) %>%
+    arrange(power) %>%
+    slice(1)
+  
+  # NA if the sim setting never gets to power=pow
+  settings_df %>%
+    left_join(mdes_df, by=names(settings_df))
+}
+
+
+# for a fixed power level, plot MDES
+mdes_fun(0.8) %>%
+  ggplot(aes(x=nbar, y=MDES, color=method)) +
+  geom_point() +
+  geom_line(aes(group=method)) +
+  facet_grid(tau ~ J, labeller=label_both )
+
+# plot MDES against power threshold
+map_df(seq(0.5, 0.9, by=0.05), mdes_fun) %>%
+  bind_rows() %>%
+  filter(J == 300) %>%
+  ggplot(aes(y=MDES, x=power_level, color=method)) +
+  geom_point() +
+  geom_line(aes(group=method)) +
+  facet_grid(tau ~ nbar, labeller=label_both)
+
 
 
 #####
@@ -263,11 +323,12 @@ ggsave("writeup/images/rmse_plot.png", width=200, height=150, units="mm")
 
 
 #####
-# check out standard errors
+# check out standard error (SE) reductions
 #####
 
+# always better than "single", as expected.
 tidy_results %>%
-  # filter(tau == 0) %>%
+  filter(tau == 0) %>%
   group_by(nbar, J, ICC, tau, tx_var, method) %>%
   summarize(SE = mean(SE)) %>%
   ggplot(aes(x = nbar, y = SE, color = method)) +
