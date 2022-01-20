@@ -98,7 +98,7 @@ coverage2_df %>%
        y = "Coverage",
        x = "Estimated site-level ATE",
        color = "Method")
-# ggsave(glue("writeup/images/coverage_plot.png"), width=200, height=125, units="mm")
+# ggsave(glue("writeup/images/cond_coverage_2sided.png"), width=200, height=125, units="mm")
 
 # plot one-sided interval coverage vs. ATE size
 coverage1_df %>%
@@ -112,7 +112,7 @@ coverage1_df %>%
        y = "Coverage",
        x = "Estimated site-level ATE",
        color = "Method")
-# ggsave(glue("writeup/images/coverage_plot.png"), width=200, height=125, units="mm")
+# ggsave(glue("writeup/images/cond_coverage_1sided.png"), width=200, height=125, units="mm")
 
 # EB coverage is the same
 
@@ -137,6 +137,7 @@ power_df %>%
        y = "Power",
        x = "Estimated site-level ATE",
        color = "Method")
+# ggsave(glue("writeup/images/cond_power_1sided.png"), width=200, height=125, units="mm")
 
 
 
