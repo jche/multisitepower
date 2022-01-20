@@ -1,0 +1,202 @@
+\documentclass[]{article}
+
+% math packages
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{bm}
+
+% for coloring in a table
+%\usepackage[table,xcdraw]{xcolor}
+
+% including graphics
+\usepackage{graphicx}
+\graphicspath{ {./images/} }
+
+% drawing graphs
+\usepackage{tikz-cd}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows}
+\tikzstyle{startstop} = [rectangle, rounded corners, minimum width=3cm, minimum height=1cm,text centered, draw=black, fill=red!10]
+\tikzstyle{arrow} = [thick,->,>=stealth]
+
+% hyperlinks
+\usepackage{hyperref}
+
+% some useful shortcuts
+\DeclareMathOperator*{\argmax}{argmax}
+\newcommand{\indep}{\perp\!\!\!\!\perp}
+\newcommand{\blambda}{{\bm{\lambda}}}
+\newcommand{\btheta}{{\bm{\theta}}}
+\newcommand{\bpsi}{{\bm{\psi}}}
+\newcommand{\by}{\mathbf{y}}
+
+\usepackage{setspace}
+\doublespacing
+
+% Editing macros
+\usepackage{color}
+\newcommand\cmnt[2]{\qquad{{\color{red} \em #1---#2} \qquad}}
+\newcommand\cmntM[1]{\cmnt{#1}{Miratrix}}
+\newcommand\cmntC[1]{\cmnt{#1}{Che}}
+\newcommand\awk{{{\color{red} {$\leftarrow$ Awkward phrasing}}\qquad}}
+\newcommand\cmntMp[1]{{\color{red} $\leftarrow$ {\em #1 -Miratrix} \qquad}}
+
+%opening
+\title{Clarifying the big questions}
+\author{Jonathan Che}
+
+\begin{document}
+
+% \maketitle
+
+\section*{What's the purpose of this document?}
+
+Mike's nice detailed comments made me realize that the draft writeup I sent over lost the forest for the trees.
+This is an attempt to clarify three confusing points for myself, and hopefully for readers as well:
+
+\begin{enumerate}
+	\item What models do people use?
+	\item What is Frequentist inference in this MLM setting?
+	\item What's the goal of this project?
+\end{enumerate}
+
+\section*{Notation}
+
+In this doc, I'll use the following notation for the parameters of interest in a normal multilevel model for a multisite trial.
+$Y_{ij}$ is an individual's outcome, $Z_{ij}$ is their treatment indicator, $\alpha_j$ is a site-level intercept, and $\tau_j$ is a site-level intervention effect.
+$\alpha_j$ and $\tau_j$ can vary across sites, and our focus is on $\tau_j$.
+\begin{align*}
+	Y_{ij} &= \alpha_j + \tau_j Z_{ij} + \epsilon_{ij} \\
+	\alpha_j &= \alpha + u_{0j} \\
+	\tau_j &= \tau + u_{1j} \\
+	\begin{pmatrix}
+		u_{0j} \\ u_{1j}
+	\end{pmatrix} &\sim N\left(
+	\begin{pmatrix}
+		0 \\ 0
+	\end{pmatrix}, 
+	\begin{bmatrix}
+		\sigma^2_\alpha & \rho_{01} \\  & \sigma^2_\tau
+	\end{bmatrix}\right) \\
+	\epsilon_{ij} &\sim N(0, \sigma^2_y) ,
+\end{align*}
+
+%\subsection{FIRC model}
+%
+%The FIRC model makes two adjustments to the generic model:
+%\begin{enumerate}
+%	\item Fixed intercept: no random intercept is allowed, so $\alpha_j = \alpha + u_{0j}$ becomes $\alpha_j = \alpha_j$.
+%	\item Treatment/control heterogeneity: separate variances for all treated units and all control units are allowed, so $\sigma^2_y$ gets split into $\sigma^2_{0}$ and $\sigma^2_{1}$ terms.
+%\end{enumerate}
+%
+%Q: The FIRC Empirical Bayes estimate for each site is equivalent to the sum of the main treatment effect plus the site's random treatment effect, correct? Or is the FIRC Empirical Bayes estimate substantively different from usual Empirical Bayes estimates in mixed-effects models?
+
+\section{What models do people use?}
+
+The first point of confusion lies in which multilevel models practitioners might actually use, and how they might actually use those models to conduct inference for the intervention effect $\tau_j$ at a particular site $j$.
+
+If the practitioner is happy to be fully Bayesian, things are straightforward.
+The practitioner specifies priors on $\tau$ and the variance parameters, fits the Bayesian model, and examines the posterior distribution of $\tau_j$ as usual.
+
+If the practitioner avoids being fully Bayesian and uses an Empirical Bayesian model like FIRC, things get confusing pretty quickly for me.
+From what I can tell, the FIRC paper isn't dogmatic about how to conduct inference for the Empirical Bayes estimate $\hat{\tau}_j^{EB}$ of the intervention effect at a single site $j$.
+Page 830 (under the section titled ``Estimating site-specific mean program effects'') addresses inference for the Empirical Bayes estimates, noting that if the values of $\sigma^2_\tau, \tau, \text{and } V_j \equiv \frac{2\sigma^2_1}{n_j} + \frac{2\sigma^2_0}{n_j}$ (assuming half of the units are treated) were known, then the standard error of $\hat{\tau}_j^{EB}$ would be $\sigma^2_\tau \sqrt{1-\lambda_j}$ for $\lambda_j \equiv \frac{\sigma^2_\tau}{\sigma^2_\tau + V_j}$.
+This leaves us with (at least) three options for conducting inference on $\tau_j$:
+\begin{enumerate}
+	\item Frequentist-flavored: Directly plug our best point estimates of $\sigma^2_\tau, \tau, \text{and } V_j$ into the standard error formula above to get a point estimate of the standard error, $\hat{SE}^{EB}_j$.
+	Construct a confidence interval for $\tau_j$ as: ($\hat{\tau}_j^{EB} \pm 1.96 \hat{SE}^{EB}_j$).
+	\item Half-Bayesian-flavored: Do the same thing as the Frequentist-flavored approach, but propagate the undertainty in the estimates of $\sigma^2_\tau, \tau, \text{and } V_j$.
+	\item Bayesian-flavored: Avoid using the standard error formula, and instead directly simulate the posterior distribution of $\tau_j$.
+\end{enumerate}
+
+I don't know which of these three routes (if any!) practitioners typically take to conduct inference on $\tau_j$ with a FIRC model.
+Things get even more confusing when trying to conduct inference on the ``rescaled'' EB estimates, adjusted to match the estimated population variance.
+Any comments here would be very helpful!
+
+\subsection{What model did I end up using?}
+
+In the writeup I do something along the lines of the Bayesian-flavored approach for the FIRC/RIRC models, though it's still not fully, properly Bayesian.
+This is obviously confusing for everyone involved, so I'll try to clarify below.
+
+In the writeup, we chose to use Andrew Gelman's \texttt{arm} package in R to compute standard errors for the Empirical Bayes estimates from the FIRC/RIRC models, assuming that this might be a reasonable path forward.
+By default, the \texttt{arm} package output for $s.e(\hat{\tau}_j)$ (using the \texttt{se.coef()} function) actually gives $s.e(\hat{u}_{1j})$, ignoring $s.e(\hat{\tau})$ entirely!\footnote{I vaguely recall seeing some generic justification for doing this in a Gelman blog post that I can't dig up anymore; the idea was along the lines that if we have enough sites, $\tau$ is estimated pretty precisely anyways, so we can safely ignore it.}
+This is why I chose to just use $s.e(\hat{u}_{1j})$ in the simulation study, assuming that any normal person wouldn't go through the trouble of digging into the \texttt{arm} package to identify this quirk.
+
+Instead of doing this, we could separately estimate $s.e(\hat{\tau})$ using the \texttt{arm} package and compute $s.e(\hat{\tau}_j)$ as $\sqrt{s.e(\hat{u}_{1j})^2 + s.e(\hat{\tau})^2}$ as Mike suggested, assuming no covariance between $\hat{u}_{1j}$ and $\hat{\tau}$.
+To be more precise, we could even use the \texttt{arm} package to directly simulate samples of $\tau_j$ to estimate the standard error of its estimate (thus avoiding having to assume no covariance)!
+
+These three approaches (using $s.e.(\hat{u}_{ij})$, using $\sqrt{s.e(\hat{u}_{1j})^2 + s.e(\hat{\tau})^2}$, and directly simulating $s.e.(\tau_j)$) are increasingly Bayesian in flavor; by the time we get to the third approach, it's not clear to me why we wouldn't just fit a fully Bayesian model in the first place (or even how the estimate would substantively differ from a fully Bayesian estimate).
+Do any of these approaches make sense to use?
+
+
+\section{What is Frequentist inference in this setting?}
+
+In general, combining Frequentist (mixed-effects models, e.g., FIRC) and Bayesian (Gelman's \texttt{arm} package) ideologies leads to a bunch of annoying fuzziness about what it means to do inference.
+I'd like to keep them separate, but for me it starts to get difficult to understand standard errors of $\hat{\tau}_j = \hat{\tau} + \hat{u}_{1j}$ in a fully Frequentist framework.
+
+To try to illustrate my confusion, let's go back to simple linear regression:
+$$y = X \beta + \epsilon.$$
+Here, we conduct inference on $\beta$ by using the randomness in $\epsilon$ (either via a normality assumption or asymptotically via the CLT) to argue that $\hat{\beta}$ is normally distributed around (true and fixed) $\beta$.
+In other words, placing a distributional assumption on $\epsilon$ is what gives us exact Frequentist inference; as a result, it doesn't really make sense to try to conduct inference on $\epsilon$.\footnote{We could try to redefine $\epsilon \equiv \hat{y} - y$ and do inference from there, but then we're technically defining $\epsilon \equiv X \hat{\beta} - X \beta - \epsilon$, and I'm confused all over again.}
+
+To conduct Frequentist inference on $u_{1j}$, we would presumably need to argue that $\hat{u}_{1j}$ is asymptotically normal around a true, fixed $u_{1j}$.
+The issue is that the MLM \textit{also} assumes that $u_{1j}$ is random, since it places a normality assumption on the distribution of random slopes.
+While it's clear that we can use the randomness in the $\epsilon_{ij}$ to conduct inference on the model coefficients that don't have additional distributional assumptions placed on them, I don't how to disentangle the facts that $u_{1j}$ needs to be random to fit the MLM, but fixed to conduct inference.
+I'm not sure whether this is a personal confusion, or if fully Frequentist inference in the MLM setting is generally confusing.
+
+%For example, consider a simple linear regression: 
+%$$Y_i = \beta_0 + \beta_1 X_i + \epsilon_i.$$
+%We conduct inference on $\beta_0$ and $\beta_1$ by using the randomness in the $\epsilon_i$ terms (either via a normality assumption or via the CLT) to argue that $\hat{\beta}_0$ and $\hat{\beta}_1$ are asymptotically normally distributed around (true and fixed) $\beta_0$ and $\beta_1$.
+%How would we conduct inference on $\epsilon_i$?
+
+%We could conduct inference on $\epsilon_i$ by using the fact that:
+%\begin{align*}
+%	\epsilon_i 
+%	&= \hat{Y}_i - Y_i \\
+%	&= (\hat{\beta}_0 - \beta_0) + (\hat{\beta_1} - \beta_1)X_i.
+%\end{align*}
+%Since $\hat{\beta}_0$ and $\hat{\beta}_1$ are asymptotically normally distributed around (true and fixed) $\beta_0$ and $\beta_1$, we can use their standard errors to estimate the standard error of $\epsilon_i$.
+
+%to estimate standard errors for $\hat{u}_{1j}$ (e.g., if $Y_{ij} = \beta_0 + \tau Z_{ij} + u_{1j} Z_{ij} + \epsilon_{ij}$ and $\hat{Y}_{ij} = \hat{\beta}_0 + \hat{\tau} Z_{ij} + \hat{u}_{1j} Z_{ij}$, what is the difference between $u_{1j}$ and $\hat{u}_{ij}$
+
+
+%\section{Some additional notes about invalid inferences}
+\section{What's the goal of this project?}
+
+As soon as we do any shrinkage, our usual inferences for the intervention effects $\tau_j$ at individual sites $j$ become invalid, at least conditionally.\footnote{By ``conditional'' inference, I mean inference conditional on the true site-level intervention effect.
+For example, in a power simulation, I might be interested in estimating power for a site with true $\tau_j = 0.2$, so I only average rejection/no rejection across sites with true $\tau_j$ close to 0.2.}
+For example, two-sided CIs for shrinkage procedures will generally overcover for $\tau_j$ values close to the estimated grand mean $\hat{\tau}$ and undercover for $\tau_j$ values far from $\hat{\tau}$; this naturally happens because all the point estimates are shrunken toward $\hat{\tau}$.
+
+This means that if a CI for a particular site comes from a hierarchical model, it's not very clear how we should interpret it!
+We would like to interpret the CI for site $j$ in the usual way, but we know that its coverage rate (for $\tau_j$, the true effect at site $j$) varies as a function of how close $\tau_j$ is to $\hat{\tau}$; the CI will overcover if they're close and undercover otherwise.
+If the CIs for each individual $\tau_j$ aren't valid in the usual Frequentist sense, it makes less practical sense to talk about power/MDES for detecting intervention effects at a single site $j$.
+
+Of course, \textit{unconditional} inference still generally holds, as we see in the ``Empirical Bayes coverage'' plots.\footnote{The term ``Empirical Bayes'' is being horribly, horribly overloaded, but I'm just following the literature here.}
+In other words, if we average coverage across all of the intervals constructed for sites $j = 1, \dots, J$, then $(1-\alpha)*100$\% of them will cover the true site-level intervention effects (over repeated experiments).
+From the conditional inference lens, this happens because the intervals overcover for sites with $\tau_j$ close to $\tau$ and undercover for sites with $\tau_j$ far from $\tau$, and under the normal model most sites have $\tau_j$ close to $\tau$.
+
+This leaves us with a big question: what are we trying to achieve with this project?
+There are a number of stories to weave together here:
+\begin{enumerate}
+	\item ``The principal at site 5 wants to know if the intervention works for their school'': In this case, we could provide CIs for $\tau_5$ conditional on the true $\tau_5$, but we'd have to caveat them: if $\hat{\tau}_5$ is far from $\hat{\tau}$, the coverage for the CI probably isn't great.
+	Alternatively, we could condition on $\hat{\tau}_5$, so that the CIs come with a different caveat: if $\hat{\tau}_5$ is \textit{close} to $\hat{\tau}$ and shrinkage is high, then the coverage for the CI probably isn't great.
+	\item ``The researcher wants to know if they're generally giving good advice about the intervention'': In this case, we can say that on average, across all $J$ sites, your EB CIs indeed have $100(1-\alpha)$\% coverage, and the RMSE of your EB point estimates is better than just using individual sites.
+	\item ``A researcher wants to run a prospective power analysis for a multisite trial, but is also interested in estimating power for individual site-level intervention effects'': Mike highlights that in order to do this, you need to posit a distribution of intervention effects! 	
+	This feels unnatural/backwards, but otherwise we can't know the direction in which shrinkage might pull our $\hat{\tau}_j$ values, so we don't know how conditional power would be affected.
+	We could use prior literature/surveys (e.g., the paper that Mike sent along) to posit these distributions.
+	\item ``A statistician wants to know the difference between EB and Bayesian models'': this is currently fuzzy, but there's a sense that EB models shrink more in the absence of informative data. When sites are small, the uncertainty in $\tau$ and $\sigma_\tau$ that we get from fully Bayesian models matters.
+\end{enumerate}
+
+%As a separate note, we know that in a fully Bayesian model, the posterior distributions of the $\tau_j$ parameters will be skewed away from the direction of pooling.
+%For example, if a site's estimated intervention effect is unusually large relative to the other sites, its posterior distribution will be skewed to the right.
+%Intuitively, this makes sense; while the majority of the posterior mass moves in the direction of the shrinkage, some posterior mass close to the original single-site estimate remains.
+%Currently, however, we're using Normal approximations to the posterior distributions of the $\tau_j$ parameters for the FIRC/RIRC models, since the \texttt{arm} package only reports standard errors, and not full posterior distribution quantiles.
+
+\subsection{One final note}
+
+As a side issue, some questions about multiple testing arise when we start to do inferences for single sites, though Gelman argues that hierarchical models fix this issue in \href{https://arxiv.org/pdf/0907.2478.pdf}{this paper}.
+This is probably worth thinking about, but might make things messy at this stage.
+
+
+	
+\end{document}
