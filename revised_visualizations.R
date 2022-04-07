@@ -128,6 +128,7 @@ if (F) {
 INCLUDE_OVERALL <- F   # include overall estimators?
 TAU_FIXED <- 0.2
 J_FIXED <- 100
+SIGMA_FIXED <- 0.2
 
 # 5 potential outcomes to visualize:
 #  * ATEhat
@@ -180,8 +181,15 @@ coverage1_df <- tidy_results %>%
 #####
 
 # plot two-sided interval coverage vs. ATE size
+# I UPDATED THIS
 coverage2_df %>%
   filter(J == J_FIXED, tau == TAU_FIXED) %>%
+  filter(method %in% c("firc2", "rirc2", "bayesnorm", "single")) %>%
+  mutate(method = case_when(
+    method == "firc2" ~ "FIRC",
+    method == "rirc2" ~ "RIRC",
+    method == "bayesnorm" ~ "Bayes",
+    method == "single" ~ "Single")) %>%
   ggplot() +
   geom_line(aes(x=ATE, y=coverage_two, color=method, group=method)) +
   facet_grid(tx_sd ~ nbar, labeller=label_both) +
@@ -191,7 +199,7 @@ coverage2_df %>%
        y = "Coverage",
        x = "True site ATE",
        color = "Method")
-# ggsave(glue("writeup/images/coverage_plot.png"), width=200, height=125, units="mm")
+ggsave(glue("writeup/images/coverage_plot.png"), width=200, height=125, units="mm")
 
 # plot one-sided interval coverage vs. ATE size
 coverage1_df %>%
@@ -303,8 +311,16 @@ map_df(seq(0.5, 0.9, by=0.05), mdes_fun) %>%
 #####
 
 # Plot power vs. ATE size
+# I UPDATED THIS
 power_df %>%
   filter(J == J_FIXED, tau == TAU_FIXED) %>%
+  filter(method %in% c("firc2", "rirc2", "bayesnorm", "single")) %>%
+  mutate(method = case_when(
+    method == "firc2" ~ "FIRC",
+    method == "rirc2" ~ "RIRC",
+    method == "bayesnorm" ~ "Bayes",
+    method == "single" ~ "Single")) %>%
+  
   ggplot(aes(x = ATE, y = power, col = method, group=method ) ) +
   facet_grid(tx_sd ~ nbar, labeller=label_both ) +
   geom_line(alpha = 0.7) +
@@ -317,7 +333,7 @@ power_df %>%
        y = "Power",
        x = "Site-level ATE",
        color = "Method")
-# ggsave(glue("writeup/images/power_plot_J300.png"), width=200, height=125, units="mm")
+# ggsave(glue("writeup/images/power_plot_J100.png"), width=200, height=125, units="mm")
 
 # Plot power gaps
 power_df_single <- power_df %>%
