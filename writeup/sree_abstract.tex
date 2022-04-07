@@ -109,24 +109,25 @@ For each simulated dataset, we run four models: a normal Bayesian hierarchical m
 
 \section{Findings/Results}
 
-Figure \ref{fig:power_plot} plots one-sided test power at $\alpha=0.1$ against true $\tau_j$ values.
-The plots are faceted by $\bar{n}$ and $\tau$, $J$ is fixed at $J=300$, and $\sigma_\tau$ is fixed at.
+Figure \ref{fig:power_plot} visualizes the main power results for one-sided hypothesis tests for the presence of a positive effect at $\alpha=0.1$.
+Power is plotted against true $\tau_j$ values for individual sites.
+The plots are faceted by $\bar{n}$ and $\sigma_\tau$, $J$ is fixed at $J=100$, and $\tau$ is fixed at $\tau=0.2$.
 The horizontal dashed reference lines are at $\alpha = 0.1$ and $0.80$; ideally, the power curve would be less than 0.1 for true ATE values less than or equal to 0, and greater than 0.8 for true ATE values greater than 0.
 
 \begin{figure}[ht]
 	\centering
-	\includegraphics[width=\textwidth]{power_plot_J300}
+	\includegraphics[width=\textwidth]{power_plot_J100}
 	\caption{Plot of power (at $\alpha = 0.1$) vs. true site ATE}
 	\label{fig:power_plot}
 \end{figure}
 
-We see that overall, using MLMs provide small boosts in power, particularly for sites with small $\tau_j$ values.
-Relative to the single-site estimator, the MLMs generally have lower power when $\tau=0$ and site estimates are shrunken toward zero, and higher power when $\tau=0.5$ and site estimate are shrunken away from zero, particularly when $\bar{n}$ is low.
-The FIRC model has much higher power than the single-site estimates for sites with small $\tau_j$ values, but that this comes at the cost of invalidity; the false positive rates for small negative $\tau_j$ values is significantly inflated.
+We see that while using MLMs can improve power relative to using single-site estimates, these improvements often come at the cost of test validity.
+This is most extreme in the low-variation setting ($\sigma_\tau = 0.1$), where the false positive rate for sites with negative $\tau_j$ values is nearly 80\%.
+In the high-variation, low-information setting ($\bar{n}=50$ and $\sigma_\tau = 0.1$), MLMs provide marginal improvements in power without losing much validity.
+Performance between the three MLMs is nearly indistinguishable.
 
-Unfortunately, the small boost in power comes at the cost of poor coverage properties.
+To help illustrate concerns with using MLMs for single-site effect estimates, we can also consider interval coverage properties.
 Figure \ref{fig:coverage_plot} plots the Frequentist conditional coverage rate of 90\% two-sided confidence intervals at each true $\tau_j$ value.
-We only visualize results for simulations for which $\tau = 0$.
 
 \begin{figure}[ht]
 	\centering
@@ -135,33 +136,16 @@ We only visualize results for simulations for which $\tau = 0$.
 	\label{fig:coverage_plot}
 \end{figure}
 
-The single-site estimates have roughly 90\% coverage regardless of the value of $\tau_j$ as expected, so we exclude them from the figure.
-We see curvature in the coverage curves for MLMs; sites with $\tau_j$ values close to $\tau$ are overcovered, and sites with $\tau_j$ values far from $\tau$ are undercovered.
-This behavior is expected when examining Frequentist coverage of procedures where shrinkage results in overcoverage for true parameter values near the center of shrinkage at the cost of undercoverage for parameter values far from the center of shrinkage.
+While the single-site estimates have roughly 90\% coverage regardless of the value of $\tau_j$ as expected, we see curvature in the coverage curves for MLMs; sites with $\tau_j$ values close to $\tau$ are overcovered, and sites with $\tau_j$ values far from $\tau$ are undercovered.
+In general, this behavior is expected when examining Frequentist coverage of shrinkage procedures.
+Shrinkage causes overcoverage for true parameter values near the center of shrinkage, the true overall average effect of $\tau=0.2$, at the cost of undercoverage for parameter values far from the center of shrinkage.
 The curvature in the coverage curve is the most extreme when sites are uninformative (e.g., smaller, so that the model does a significant amount of shrinking), and it becomes less extreme as the sites grow more informative (e.g., larger).
 
 \section{Conclusions}
 
-We like to use MLMs.
-They don't help with individual site estimates, in the Frequentist sense.
-In conclusion, you should use them to understand site heterogeneity, but the shrunken estimates aren't great.
-
-simulations give us three primary conclusions:
-\begin{enumerate}
-	\item In most settings, using an MLM barely increases power relative to just using the single site, regardless of the number of sites $J$.
-	\item Larger average site effects increase single-site power for multilevel models, but this comes with notably worse false positive rates (i.e., invalidity); similarly, smaller average site effects decrease single-site power for multilevel models.
-	\item The FIRC model has higher power but bad false positive rates compared to the other models.
-\end{enumerate}
-
-Overall, MLM shrinkage marginally increases rejection rates, relative to single-site estimates.
-The increase in power, however, is not particularly strong, and often comes with inflated false positive rates and poor coverage properties.
-When comparing different MLMs, we saw that while the FIRC model rejects the null more frequently than the RIRC and fully Bayesian models, it does so at the cost of an inflated type-I error rate.
-Similarly, the RIRC model exhibits slightly higher power in certain scenarios at the cost of poor coverage in low-data settings, though its coverage is not nearly as bad as the FIRC model's coverage.
-Finally, while the fully Bayesian model always has approximately appropriate coverage, it only improves power when $\tau$ is high (and $\tau_j$ estimates are biased upward), and significantly decreases power when $\tau$ is low.
-
-Ultimately, this simulation study shows that MLMs do not really help to improve point estimates or inferences for treatment effects at individual sites.
-While MLMs certainly improve estimates for the full collection of site estimates in terms of RMSE, this does not imply better estimates for any particular site (a la Stein's paradox\footnote{Stein's paradox notes that when estimating three or more parameters at the same time, it is possible to construct an estimator that is better for the collection of all three parameters, in terms of average MSE, than any estimator that estimates the three parameters separately.
-This, however, does not imply that the new estimator is better for any individual parameter.}).
+In many multisite trials, practitioners may be interested in using the estimates produced by MLMs to conduct inference on treatment effects at individual sites.
+While MLMs can improve estimation of the overall average treatment effect and cross-site effect heterogeneity, they do not generally improve inferences for individual sites.
+In particular, shrinkage can lead to undesirable Frequentist validity and coverage properties, particularly in settings where shrinkage is high.
 Practitioners interested in improving power to detect effects at individual sites should aim to make the individual site's estimate more precise, rather than aiming to add other sites to the analysis.
 
 \bibliography{refs.bib}
