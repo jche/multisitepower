@@ -78,6 +78,56 @@ coverage1_df <- tidy_results %>%
 # coverage plots
 #####
 
+# THINKING ABOUT A BIG IDEA: vertical average != horizontal average
+#  - For each tau_j value, MLMs are biased toward tau
+#  - For each tauhat_j value, single-site estimates are biased toward tau
+#    - idea: "if I happen to estimate 0.4, but my population is mostly
+#      around 0.2, then it's probably due to error, so in reality I'm
+#      closer to 0.2."
+#    - I.e., we need to do shrinkage here!
+
+res_sm <- tidy_results %>%
+  {if (!INCLUDE_OVERALL) filter(., !str_detect(method, "_overall")) else .} %>%
+  filter(J == J_FIXED, tau == TAU_FIXED, nbar == 250, tx_sd == 0.1) %>%
+  group_by(nbar, J, ICC, tau, tx_sd, method, ATEhat_bin) %>%
+  mutate(n = n()) %>%
+  filter(n >= 50) %>%
+  ungroup()
+
+# # unaveraged scatterplot of ATEhat vs. ATE
+# res_sm %>% 
+#   sample_n(10000) %>%
+#   ggplot(aes(x=ATE, y=ATEhat_bin, color=method)) +
+#   geom_point() +
+#   geom_abline() +
+#   facet_grid( ~ method, labeller=label_both)
+
+# vertical averages (per ATE, average ATEhat)
+vert_avg <- res_sm %>% 
+  group_by(method, ATE) %>%
+  summarize(ATEhat_bin = mean(ATEhat_bin))
+
+# horizontal averages(per ATEhat, average ATE)
+hor_avg <- res_sm %>% 
+  group_by(method, ATEhat_bin) %>%
+  summarize(ATE = mean(ATE))
+
+# plot everything at once
+res_sm %>% 
+  filter(method %in% c("bayesnorm", "single")) %>%
+  sample_n(10000) %>%
+  ggplot(aes(x=ATE, y=ATEhat_bin, color=method)) +
+  geom_point() +
+  geom_point(data=vert_avg %>% 
+               filter(method %in% c("bayesnorm", "single")), 
+             color="black") +
+  geom_point(data=hor_avg %>% 
+               filter(method %in% c("bayesnorm", "single")), 
+             color="red") +
+  geom_abline() +
+  facet_grid( ~ method, labeller=label_both)
+
+
 # THESE ARE THE OPPOSITE(ISH) OF THE OTHER COVERAGE PLOTS!
 #  - single-site coverage is curved (when the estimate is extreme, it's probably wrong)
 #  - MLM coverage is (almost) flat!
@@ -93,6 +143,7 @@ coverage2_df %>%
   geom_line(aes(x=ATEhat_bin, y=coverage_two, color=method, group=method)) +
   facet_grid(tx_sd ~ nbar, labeller=label_both) +
   geom_hline(yintercept=0.9, lty="dashed") +
+  geom_vline(xintercept=TAU_FIXED) +
   labs(title = "Conditional coverage rates (two-sided CI)",
        subtitle = glue("J = {J_FIXED}, tau = {TAU_FIXED}"),
        y = "Coverage",
