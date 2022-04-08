@@ -154,6 +154,12 @@ coverage2_df %>%
 # plot one-sided interval coverage vs. ATE size
 coverage1_df %>%
   filter(J == J_FIXED, tau == TAU_FIXED) %>%
+  filter(method %in% c("firc2", "rirc2", "bayesnorm", "single")) %>%
+  mutate(method = case_when(
+    method == "firc2" ~ "FIRC",
+    method == "rirc2" ~ "RIRC",
+    method == "bayesnorm" ~ "Bayes",
+    method == "single" ~ "Single")) %>%
   ggplot() +
   geom_line(aes(x=ATEhat_bin, y=coverage_one, color=method, group=method)) +
   facet_grid(tx_sd ~ nbar, labeller=label_both) +
