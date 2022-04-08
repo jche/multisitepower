@@ -130,7 +130,7 @@ ideally, the power curves would all be less than $\alpha = 0.1$ for $\tau_j \leq
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{power_plot_J100}
-	\caption{Plot of power (at $\alpha = 0.1$) vs. true site ATE}
+	\caption{Power (at $\alpha = 0.1$) vs. true site ATE}
 	\label{fig:power_plot}
 \end{figure}
 
@@ -141,45 +141,48 @@ This behavior is expected for MLMs when power is computed at fixed values of $\t
 In this example, the MLMs naturally shrink estimates for sites with unusually small $\tau_j$ values toward the estimated overall mean, which is closer to $\tau = 0.2$.
 The MLMs therefore estimate more positive effects for sites with negative $\tau_j$ values, resulting in many false rejections, particularly when shrinkage is strong.
 Generally speaking, we implement MLMs in order to systematically shrink point estimates toward the overall mean.
-This naturally results in interval undercoverage (and falsely inflated power) for sites with true $\tau_j$ values far from the overall mean, as demonstrated in Figure
-
+This naturally results in interval undercoverage (and falsely inflated power) for sites with true $\tau_j$ values far from the overall mean, as demonstrated in Figure \ref{fig:coverage_plot}.
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{writeup/images/coverage_plot.png}
-	\caption{Plot of power (at $\alpha = 0.1$) vs. true site ATE}
-	\label{fig:power_plot}
+	\caption{Coverage (at $\alpha = 0.1$) vs. true site ATE}
+	\label{fig:coverage_plot}
 \end{figure}
 
-In other words, MLMs have poor Frequentist coverage properties for fixed $\tau_j$ values.
+In other words, MLMs have poor Frequentist coverage properties for fixed $\tau_j$ values, unlike running separate t-tests for each site.
 MLMs, however, have excellent coverage properties and power \textit{for fixed $\hat{\tau}_j$ values} when they are well-specified.
 Figure \ref{fig:power_plot_cond} replicates Figure \ref{fig:power_plot}, except now test powers (i.e., rejection rates) are computed for fixed $\hat{\tau}_j$ values rather than for fixed $\tau_j$ values.
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{cond_power_1sided}
-	\caption{Plot of power (at $\alpha = 0.1$) vs. estimated site ATE}
+	\caption{Power (at $\alpha = 0.1$) vs. estimated site ATE}
 	\label{fig:power_plot_cond}
 \end{figure}
+Under this setup, we see that the MLMs have significantly greater power than the individual t-tests.
+Figure \ref{fig:coverage_plot_cond} also shows that the coverage rates for the MLMs are generally correct.
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=\textwidth]{writeup/images/cond_coverage_1sided.png}
+	\caption{Coverage (at $\alpha = 0.1$) vs. estimated site ATE}
+	\label{fig:coverage_plot_cond}
+\end{figure}
 
-Under this setup, we see that the MLMs have significantly greater power 
+The results in Figures \ref{fig:power_plot_cond} and \ref{fig:coverage_plot_cond} are due to the MLMs appropriately shrinking extreme site-level effect estimates.
+Estimated site-level effects $\hat{\tau}_j$ may be extreme either because $\tau_j$ is extreme or because of random noise.
+MLMs use shrinkage to account for the fact that the majority of extreme $\hat{\tau}_j$ estimates are due to random noise rather than actual extreme signals; as a result, we see in our simulations that they produce intervals with better coverage rates than do individual site t-tests, particularly for large $\hat{\tau}_j$ values.
+Shrinkage also results in narrower intervals for sites with $\hat{\tau}_j$ close to the estimated overall average treatment effect, which improves power for those sites.
 
-For each fixed $\hat{\tau}_j$ value, MLM coverage grows to become good, and MLMs have much better power.
-Note that this is not post-hoc power; we're treating tau-hat as a completely separate thing from tau.
-
-The idea is shown in Figure 5.
-This is the whole idea behind MLMs; shrinkage is by definition bias, but it produces better overall estimates in terms of RMSE (not shown here).
-If we're interested in individual sites, better RMSE doesn't necessarily guarantee us anything for each individual site (plus it doesn't care about inference).
-We only have average coverage guarantees.
-
-At each tau-j value, tau-hat is biased due to shrinkage.
-At each tau-hat value, single-site estimates are biased because they don't appropriately account for the fact that in the population, extreme tau-j values are unlikely.
-MLMs shrink to account for this, so at each tau-hat value, the average tau-j is the same as tau-hat.
 
 \section{Conclusions}
 
-In many multisite trials, practitioners may be interested in using the estimates produced by MLMs to conduct inference on treatment effects at individual sites.
-While MLMs can improve estimation of the overall average treatment effect and cross-site effect heterogeneity, they do not generally improve inferences for individual sites.
-In particular, shrinkage can lead to undesirable Frequentist validity and coverage properties, particularly in settings where shrinkage is high.
-Practitioners interested in improving power to detect effects at individual sites should aim to make the individual site's estimate more precise, rather than aiming to add other sites to the analysis.
+In many multisite trials, practitioners often wish to use the estimates produced by MLMs to conduct inference on treatment effects at individual sites.
+The credible intervals generated by MLMs, however, only guarantee average coverage rates across all sites, and not for a particular site with a true treatment effect $\tau_j$.
+As a result, Frequentist power analyses for fixed $\tau_j$ values indicate that while MLMs have more power for detecting effects at individual sites than does separately testing each site, they are generally invalid.
+
+If we insist on using the credible intervals generated by MLMs for individual site estimates, we may instead consider power and coverage conditional on the estimated site-level effects $\hat{\tau}_j$.
+For example, an analyst may posit a value for an estimated site-level effect $c$ and compute power for sites with $\hat{\tau}_j = c$.
+This alternative framing highlights the benefits of shrinkage for individual site-level effect estimates.
+
 
 \bibliography{refs.bib}
 	
