@@ -141,11 +141,18 @@ This behavior is expected for MLMs when power is computed at fixed values of $\t
 In this example, the MLMs naturally shrink estimates for sites with unusually small $\tau_j$ values toward the estimated overall mean, which is closer to $\tau = 0.2$.
 The MLMs therefore estimate more positive effects for sites with negative $\tau_j$ values, resulting in many false rejections, particularly when shrinkage is strong.
 Generally speaking, we implement MLMs in order to systematically shrink point estimates toward the overall mean.
-This naturally results in interval undercoverage (and falsely inflated power) for sites with true $\tau_j$ values far from the overall mean.
+This naturally results in interval undercoverage (and falsely inflated power) for sites with true $\tau_j$ values far from the overall mean, as demonstrated in Figure
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=\textwidth]{writeup/images/coverage_plot.png}
+	\caption{Plot of power (at $\alpha = 0.1$) vs. true site ATE}
+	\label{fig:power_plot}
+\end{figure}
 
 In other words, MLMs have poor Frequentist coverage properties for fixed $\tau_j$ values.
 MLMs, however, have excellent coverage properties and power \textit{for fixed $\hat{\tau}_j$ values} when they are well-specified.
-Figure \ref{fig:power_plot_cond} is the same as Figure \ref{fig:power_plot}, except now power is computed for fixed $\hat{\tau}_j$ values rather than for fixed $\tau_j$ values.
+Figure \ref{fig:power_plot_cond} replicates Figure \ref{fig:power_plot}, except now test powers (i.e., rejection rates) are computed for fixed $\hat{\tau}_j$ values rather than for fixed $\tau_j$ values.
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{cond_power_1sided}
@@ -153,11 +160,8 @@ Figure \ref{fig:power_plot_cond} is the same as Figure \ref{fig:power_plot}, exc
 	\label{fig:power_plot_cond}
 \end{figure}
 
+Under this setup, we see that the MLMs have significantly greater power 
 
-
-If MLM intervals are biased for $\tau_j$ values, why are they good to use?
-We can define another analogue of power: probability of rejecting null given $\hat{\tau}_j$.
-Figures 3 and 4 show how this works out.
 For each fixed $\hat{\tau}_j$ value, MLM coverage grows to become good, and MLMs have much better power.
 Note that this is not post-hoc power; we're treating tau-hat as a completely separate thing from tau.
 
