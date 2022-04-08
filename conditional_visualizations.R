@@ -176,6 +176,12 @@ coverage1_df %>%
 #  - NOTE: power is probability of TRUE rejection, so need to account for that here
 power_df %>%
   filter(J == J_FIXED, tau == TAU_FIXED) %>%
+  filter(method %in% c("firc2", "rirc2", "bayesnorm", "single")) %>%
+  mutate(method = case_when(
+    method == "firc2" ~ "FIRC",
+    method == "rirc2" ~ "RIRC",
+    method == "bayesnorm" ~ "Bayes",
+    method == "single" ~ "Single")) %>%
   ggplot(aes(x = ATEhat_bin, y = power, col = method, group=method ) ) +
   facet_grid(tx_sd ~ nbar, labeller=label_both ) +
   geom_line(alpha = 0.7) +
