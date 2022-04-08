@@ -48,7 +48,7 @@
 
 
 %opening
-\title{Power analyses for individual site impacts in multisite trials}
+\title{On power analyses for individual site impacts in multisite trials}
 \author{Jonathan Che \& Luke Miratrix}
 
 \begin{document}
@@ -58,62 +58,75 @@
 
 \section{Background}
 
-Power analyses for multisite trials generally ensure that a given design will achieve desired levels of power for the overall average treatment effect across all sites. [TODO: add references for prior power analysis stuff for multisite trials, like Kristen’s power formula work, formulas for detecting cross-site impact heterogeneity, etc?] 
+Power analyses for multisite trials generally ensure that a given design will achieve desired levels of power for the overall average treatment effect $\tau$ across all sites. [TODO: add references for prior power analysis stuff for multisite trials, like Kristen’s power formula work, formulas for detecting cross-site impact heterogeneity, etc?] 
 
-In many applications, however, site stakeholders may be interested in estimating treatment effects at the individual sites as well. 
-Analysts typically use multilevel models (MLMs) to generate partially pooled estimates of these site-level treatment effects. 
-For each site, these models ``borrow strength'' from the other sites, resulting in site-level estimates that are shrunken toward the overall average estimated treatment effect.
+In many applications, however, site stakeholders may be interested in estimating treatment effects $\tau_j$ at the individual sites $j$ as well, for sites $j = 1, \dots, J$.
+Analysts typically use multilevel models (MLMs) to produce partially pooled estimates of $\tau_j$.
+For each site, these models ``borrow strength'' from the other sites, resulting in estimates $\hat{\tau}_j$ that are shrunken toward the estimated overall average treatment effect $\hat{\tau}$.
+Standard Bayesian procedures may be used to construct credible intervals to conduct inference on the individual site-level effects.
 
-The construction of confidence intervals around these shrunken estimates requires some nuance. 
-There is an extensive literature concerning the construction of appropriate credible intervals for individual site effects under shrinkage \citep{casella2012shrinkage}.
-These credible intervals, however, only satisfy so-called Empirical Bayes (EB) coverage \citep{morris1983parametric}, which means that they only provide guarantees for \textit{average} coverage across sites rather than coverage for any particular site. 
-These guarantees may not be sufficient for stakeholders in multisite trials specifically interested in knowing whether an experimental treatment had a positive effect at their site. 
-Overall, the question of inference for individual site effects in multilevel models remains fairly open \citep{armstrong2020robust}, with limited guidance about best practices.
-
-In this paper, we conduct power analyses for detecting hypothesized effects for individual sites in multisite trials. 
-Similar power analyses have previously been conducted for the overall average treatment effect and cross-site variation in multisite trials (e.g., \citet{raudenbush2000statistical}), but not for individual site-effect estimates, to the best of our knowledge.
-
+The interpretation of these credible intervals requires some nuance.
+There is an extensive literature concerning the construction of such intervals for individual site effects under shrinkage \citep{casella2012shrinkage}.
+These intervals typically possess a so-called Empirical Bayes coverage property \citep{morris1983parametric}, i.e., they guarantee coverage for the collection of $\tau_j$ values \textit{on average} across all $J$ sites, not coverage for each individual $\tau_j$.
+These guarantees may not be sufficient for stakeholders in multisite trials interested in understanding the effect of an experimental treatment at their particular site.
+Overall, the question of inference for individual $\tau_j$ values in multilevel models remains fairly open \citep{armstrong2020robust}, with limited guidance about best practices.
 
 \section{Objective}
 
-This paper serves as a guide for practitioners interested in powering their multisite trial analyses to detect individual site-level effects. 
-To this end, we conduct power analyses for a suite of popular multilevel modeling methods and provide practical advice for researchers.
+In this paper, we first clarify how to interpret the individual site-level effect estimates produced by MLMs.
+We then conduct power analyses to explore how well MLMs can detect hypothesized effects for individual sites in multisite trials.
+Similar power analyses have previously been conducted for the overall average treatment effect and cross-site variation in multisite trials \citep{raudenbush2000statistical}, but not for individual site-effect estimates, to the best of our knowledge.
 
+% Two ideas to add:
+% Idea 1: we're assuming exchangeability, so before the trial is run, everyone is the same to some extent?
+% Idea 2: post-hoc power analyses are bad \href{https://statmodeling.stat.columbia.edu/2018/09/24/dont-calculate-post-hoc-power-using-observed-estimate-effect-size/}{says Gelman}
+
+% We're doing a weird mix of pre- and post-trial stuff.
+% In terms of coverage, things make sense.
+% One idea: before we've run the analysis, what's the coverage of my intervals for sites with a true effect size of $\tau_j = 0.3$?
+% Another idea: before we've run the analysis, what's the coverage of my intervals for sites with estimated $\hat{\tau}_j = 0.3$?
+
+% In terms of power, things get weird.
+% One idea: before we've run the analysis, what's the power of my procedure to detect effects at sites with $\tau_j = 0.3$?
+% Another idea: before we've run the analysis, what's the power of my procedure to detect effects at sites with $\hat{\tau}_j = 0.3$?
+
+% Is this second idea useful?
+% Say I've run the trial and my observed $\hat{\tau}_j = 0.3$.
+% The power analysis isn't useful at this point; I just have whatever interval I have, which says what it says.
+
+% Something to note: power conditional on tau-hat depends strongly on the distribution of the $\tau_j$ values.
+% Power conditional on $\tau_j$ depends less strongly on that, perhaps?
+
+% The issue with post-hoc power analyses is...
+% Plugging in $\hat{\tau}$ for $\tau$ is bad.
+% Here, we're treating $\hat{\tau}_j$ and $\tau_j$ as completely different things, so it avoids those issues.
+
+
+% Arc of the story: MLMs are bad if we're considering power at individual $\tau_j$ values.
+% This is because individual CIs are by definition biased for individual $\tau_j$ values.
+% This bias leads to weird coverage properties, and bad inferences.
+
+% MLMs are good if we're considering power at individual $\hat{\tau}_j$ values.
+% This is because shrinkage helps; based on the collection of sites, we can get information that an extreme $\hat{\tau}_j$ value is likely due to measurement error/noise, and not an extreme signal $\tau_j$.
+% By pooling information, we are more likely to reject the null for any particular $\hat{\tau}_j$.
+
+% TODO: study interval length
 
 \section{Research Design}
 
-We conduct a large-scale simulation study to explore power for individual site-level effects. 
-We repeatedly simulate data under a standard normal hierarchical model
-% for individuals $i$ in sites $j$ of: 
-% \begin{align*}
-% 	Y_{ij} &= \alpha_j + \tau_j Z_{ij} + \epsilon_{ij} \\
-% 	\alpha_j &= \alpha + u_{0j} \\
-% 	\tau_j &= \tau + u_{1j} \\
-% 	\begin{pmatrix}
-% 		u_{0j} \\ u_{1j}
-% 	\end{pmatrix} &\sim N\left(
-% 	\begin{pmatrix}
-% 		0 \\ 0
-% 	\end{pmatrix}, 
-% 	\begin{bmatrix}
-% 		\sigma^2_\alpha & \rho_{01} \\  & \sigma^2_\tau
-% 	\end{bmatrix}\right) \\
-% 	\epsilon_{ij} &\sim N(0, \sigma^2_y) ,
-% \end{align*}
-% for individual outcomes $Y_{ij}$, individual treatment indicators $Z_{ij}$, random site intercepts $\alpha_j$, and random site treatment effects $\tau_j$.
-% To simplify things, we will operate in effect-size units, assuming data are rescaled such that $Var(Y_{ij} \mid Z_{ij}=0) = 1$, i.e., that $\sigma^2_y + \sigma^2_\alpha = 1$.
-% This also implies that $ICC = \sigma^2_\alpha / (\sigma^2_y + \sigma^2_\alpha) = \sigma^2_\alpha$.
-% Finally, we set $\rho_{10} = 0$ so that intercept and treatment random effects are uncorrelated.
-where we vary four data-generating parameters: the average size of each site $\bar{n}$, the number of sites $J$, the true overall average treatment effect $\tau$, and the true cross-site variation in site-level effects $\sigma^2_\tau$.
-For each simulated dataset, we run four models: a normal Bayesian hierarchical model; a fixed-intercept, random-coefficients (FIRC) model; a random-intercepts, random-coefficients (RIRC) model; and a separate t-test for each site. Finally, we record each model’s estimates of site-level effects and their associated standard errors.
+We conduct a simulation study to explore power for individual site-level effects. 
+We repeatedly simulate data under a normal hierarchical model where we vary four data-generating parameters: the average size of each site $\bar{n}$, the number of sites $J$, the true overall average treatment effect $\tau$, and the true cross-site variation in site-level effects $\sigma^2_\tau$.
+For each simulated dataset, we run four models: a normal Bayesian hierarchical model; a fixed-intercept, random-coefficients (FIRC) model \citep{bloom2017using}; a random-intercepts, random-coefficients (RIRC) model; and a separate t-test for each site. Finally, we record each model’s estimates of site-level effects and their associated credible intervals.
 
 \section{Findings/Results}
 
-Figure \ref{fig:power_plot} visualizes the main power results for one-sided hypothesis tests for the presence of a positive effect at $\alpha=0.1$.
-Power is plotted against true $\tau_j$ values for individual sites.
-The plots are faceted by $\bar{n}$ and $\sigma_\tau$, $J$ is fixed at $J=100$, and $\tau$ is fixed at $\tau=0.2$.
-The horizontal dashed reference lines are at $\alpha = 0.1$ and $0.80$; ideally, the power curve would be less than 0.1 for true ATE values less than or equal to 0, and greater than 0.8 for true ATE values greater than 0.
-
+In a standard power analysis, the analyst posits an effect size $c$ and computes power (at level $\alpha$), possibly for a range of sample sizes.
+An analogous procedure for site-level effects in a multisite trial would be to fix a true site-level effect $c$ and compute power as the probability of rejecting the null when the true site-level effect is $c$.
+Figure \ref{fig:power_plot} visualizes the results of a power simulation under this setup.
+The power of a one-sided hypothesis test for a positive effect ($\alpha = 0.1$) is plotted against the true site-level effect size $\tau_j$.
+% We fix $J = 100$ and $\tau = 0.2$, and vary $\bar{n}$ and $\sigma_\tau$ along the facets.
+The dashed reference lines are at $0.1$ and $0.8$; 
+ideally, the power curves would all be less than $\alpha = 0.1$ for $\tau_j \leq 0$ to ensure test validity and as high as possible for $\tau_j > 0$ to maximize test power.
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{power_plot_J100}
@@ -121,25 +134,41 @@ The horizontal dashed reference lines are at $\alpha = 0.1$ and $0.80$; ideally,
 	\label{fig:power_plot}
 \end{figure}
 
-We see that while using MLMs can improve power relative to using single-site estimates, these improvements often come at the cost of test validity.
-This is most extreme in the low-variation setting ($\sigma_\tau = 0.1$), where the false positive rate for sites with negative $\tau_j$ values is nearly 80\%.
-In the high-variation, low-information setting ($\bar{n}=50$ and $\sigma_\tau = 0.1$), MLMs provide marginal improvements in power without losing much validity.
-Performance between the three MLMs is nearly indistinguishable.
+We see that while using MLMs improve power relative to estimating each site separately, these improvements often come at the cost of test validity.
+This result holds for all of the MLMs, and is particularly extreme when $\sigma_\tau = 0.1$, where the false positive rate for sites with negative $\tau_j$ values is nearly 80\%.
 
-To help illustrate concerns with using MLMs for single-site effect estimates, we can also consider interval coverage properties.
-Figure \ref{fig:coverage_plot} plots the Frequentist conditional coverage rate of 90\% two-sided confidence intervals at each true $\tau_j$ value.
+This behavior is expected for MLMs when power is computed at fixed values of $\tau_j$.
+In this example, the MLMs naturally shrink estimates for sites with unusually small $\tau_j$ values toward the estimated overall mean, which is closer to $\tau = 0.2$.
+The MLMs therefore estimate more positive effects for sites with negative $\tau_j$ values, resulting in many false rejections, particularly when shrinkage is strong.
+Generally speaking, we implement MLMs in order to systematically shrink point estimates toward the overall mean.
+This naturally results in interval undercoverage (and falsely inflated power) for sites with true $\tau_j$ values far from the overall mean.
 
+In other words, MLMs have poor Frequentist coverage properties for fixed $\tau_j$ values.
+MLMs, however, have excellent coverage properties and power \textit{for fixed $\hat{\tau}_j$ values} when they are well-specified.
+Figure \ref{fig:power_plot_cond} is the same as Figure \ref{fig:power_plot}, except now power is computed for fixed $\hat{\tau}_j$ values rather than for fixed $\tau_j$ values.
 \begin{figure}[ht]
 	\centering
-	\includegraphics[width=\textwidth]{coverage_plot}
-	\caption{Coverage of 90\% confidence intervals for each $\tau_j$ value}
-	\label{fig:coverage_plot}
+	\includegraphics[width=\textwidth]{cond_power_1sided}
+	\caption{Plot of power (at $\alpha = 0.1$) vs. estimated site ATE}
+	\label{fig:power_plot_cond}
 \end{figure}
 
-While the single-site estimates have roughly 90\% coverage regardless of the value of $\tau_j$ as expected, we see curvature in the coverage curves for MLMs; sites with $\tau_j$ values close to $\tau$ are overcovered, and sites with $\tau_j$ values far from $\tau$ are undercovered.
-In general, this behavior is expected when examining Frequentist coverage of shrinkage procedures.
-Shrinkage causes overcoverage for true parameter values near the center of shrinkage, the true overall average effect of $\tau=0.2$, at the cost of undercoverage for parameter values far from the center of shrinkage.
-The curvature in the coverage curve is the most extreme when sites are uninformative (e.g., smaller, so that the model does a significant amount of shrinking), and it becomes less extreme as the sites grow more informative (e.g., larger).
+
+
+If MLM intervals are biased for $\tau_j$ values, why are they good to use?
+We can define another analogue of power: probability of rejecting null given $\hat{\tau}_j$.
+Figures 3 and 4 show how this works out.
+For each fixed $\hat{\tau}_j$ value, MLM coverage grows to become good, and MLMs have much better power.
+Note that this is not post-hoc power; we're treating tau-hat as a completely separate thing from tau.
+
+The idea is shown in Figure 5.
+This is the whole idea behind MLMs; shrinkage is by definition bias, but it produces better overall estimates in terms of RMSE (not shown here).
+If we're interested in individual sites, better RMSE doesn't necessarily guarantee us anything for each individual site (plus it doesn't care about inference).
+We only have average coverage guarantees.
+
+At each tau-j value, tau-hat is biased due to shrinkage.
+At each tau-hat value, single-site estimates are biased because they don't appropriately account for the fact that in the population, extreme tau-j values are unlikely.
+MLMs shrink to account for this, so at each tau-hat value, the average tau-j is the same as tau-hat.
 
 \section{Conclusions}
 
