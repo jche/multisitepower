@@ -184,9 +184,21 @@ A naive power analysis that posits an effect size $\tau_j^*$ that the analyst wo
 
 Instead of naive Frequentist power analyses, we propose that analysts may conduct prospective interval-length analyses.
 Using the simulation framework in this paper, an analyst can size a study to achieve a particular average interval width, across sites.
-Figure 
+Figure \ref{fig:length_plot} demonstrates an example of this analysis.
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=\textwidth]{writeup/images/length_plot.png}
+	\caption{Average two-sided credible interval length (at $\alpha = 0.1$)}
+	\label{fig:length_plot}
+\end{figure}
+We see that using MLMs significantly decreases average interval length, particularly when $\sigma_\tau$ is small (i.e., shrinkage is high).
+If, for example, an interval length of 0.4 is desired, and treatment-effect variation is expected to be moderate ($\sigma_\tau$
 
 
+Given a posited average and spread of the true site-level effects $\tau_j$, an analyst could proceed to size a study so that an appropriate MLM would produce credible intervals of a desired average length.
+
+
+The credible intervals produced by MLMs have nominal coverage rates, provided that one does not condition on any particular true $\tau_j$ value.
 
 
 This means that 
