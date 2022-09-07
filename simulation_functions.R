@@ -66,78 +66,81 @@ one_sim <- function(nbar, J, tau, ICC, tx_sd,
     ungroup() %>%
     mutate(sid = as.character(sid))
   
-  ### run frequentist multilevel models (FIRC and RIRC)
-  
-  # FIRC model #1 (via generic arm package functions)
-  mod_firc = lmer( Yobs ~ 0 + as.factor(sid) + Z + (0+Z|sid), data=dat)
-  
-  ATEhat_firc <- coef(mod_firc)$sid$Z
-  SE_firc1 <- sqrt(se.fixef(mod_firc)["Z"]^2 + se.ranef(mod_firc)$sid[,"Z"]^2)
-  
-  res_firc1 <- tibble(sid = as.character(1:J),
-                      ATEhat = ATEhat_firc,
-                      SE = SE_firc1) %>%
-    rowwise() %>%
-    mutate(q = list(ATEhat + qnorm(QUANTILES) * SE)) %>%
-    unnest(cols = q) %>%
-    group_by(sid) %>%
-    mutate(quantile = QUANTILES) %>%
-    ungroup() %>%
-    pivot_wider(names_from = quantile, values_from = q, names_prefix = "q")
-  names(res_firc1) <- c("sid", paste0(NAME_VEC, "_firc1"))
-  
-  # FIRC model #2 (via arm package sampling functions)
-  
-  # grabbing arm package samples
-  sim_firc <- sim(mod_firc, n.sims = NUMSAMP)
-  fixef_samps_firc <- coef(sim_firc)[["fixef"]][,"Z"]
-  ranef_samps_firc <- coef(sim_firc)[["ranef"]]$sid[,,"Z"]
-  
-  res_firc2 <- tibble(
-    sid = as.character(1:J),
-    ATEhat = ATEhat_firc,
-    SE = apply(ranef_samps_firc, 2, function(x) sd(x + fixef_samps_firc))
-  ) %>%
-    cbind(t(apply(ranef_samps_firc, 2, 
-                  function(x) quantile(x + fixef_samps_firc, probs=QUANTILES)))) %>%
-    as_tibble(.name_repair = "minimal")
-  names(res_firc2) <- c("sid", paste0(NAME_VEC, "_firc2"))
-  
-  # RIRC model #1 (via generic arm package functions)
-  mod_rirc = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )
-  
-  ATEhat_rirc <- coef(mod_rirc)$sid$Z
-  SE_rirc1 <- sqrt(se.fixef(mod_rirc)["Z"]^2 + se.ranef(mod_rirc)$sid[,"Z"]^2)
-  
-  res_rirc1 <- tibble(sid = as.character(1:J),
-                      ATEhat = ATEhat_rirc,
-                      SE = SE_rirc1) %>%
-    rowwise() %>%
-    mutate(q = list(ATEhat + qnorm(QUANTILES) * SE)) %>%
-    unnest(cols = q) %>%
-    group_by(sid) %>%
-    mutate(quantile = QUANTILES) %>%
-    ungroup() %>%
-    pivot_wider(names_from = quantile, values_from = q, 
-                names_prefix = "q")
-  names(res_rirc1) <- c("sid", paste0(NAME_VEC, "_rirc1"))
-  
-  # RIRC model #2 (via arm package sampling functions)
-  
-  # grabbing arm package samples
-  sim_rirc <- sim(mod_rirc, n.sims = NUMSAMP)
-  fixef_samps_rirc <- coef(sim_rirc)[["fixef"]][,"Z"]
-  ranef_samps_rirc <- coef(sim_rirc)[["ranef"]]$sid[,,"Z"]
-  
-  res_rirc2 <- tibble(
-    sid = as.character(1:J),
-    ATEhat_rirc2 = ATEhat_rirc,
-    SE_rirc2 = apply(ranef_samps_rirc, 2, function(x) sd(x + fixef_samps_rirc))
-  ) %>%
-    cbind(t(apply(ranef_samps_rirc, 2, 
-                  function(x) quantile(x + fixef_samps_rirc, probs=QUANTILES)))) %>%
-    as_tibble(.name_repair = "minimal")
-  names(res_rirc2) <- c("sid", paste0(NAME_VEC, "_rirc2"))
+  if (F) {
+    ### run frequentist multilevel models (FIRC and RIRC)
+    
+    # FIRC model #1 (via generic arm package functions)
+    mod_firc = lmer( Yobs ~ 0 + as.factor(sid) + Z + (0+Z|sid), data=dat)
+    
+    ATEhat_firc <- coef(mod_firc)$sid$Z
+    SE_firc1 <- sqrt(se.fixef(mod_firc)["Z"]^2 + se.ranef(mod_firc)$sid[,"Z"]^2)
+    
+    res_firc1 <- tibble(sid = as.character(1:J),
+                        ATEhat = ATEhat_firc,
+                        SE = SE_firc1) %>%
+      rowwise() %>%
+      mutate(q = list(ATEhat + qnorm(QUANTILES) * SE)) %>%
+      unnest(cols = q) %>%
+      group_by(sid) %>%
+      mutate(quantile = QUANTILES) %>%
+      ungroup() %>%
+      pivot_wider(names_from = quantile, values_from = q, names_prefix = "q")
+    names(res_firc1) <- c("sid", paste0(NAME_VEC, "_firc1"))
+    
+    # FIRC model #2 (via arm package sampling functions)
+    
+    # grabbing arm package samples
+    sim_firc <- sim(mod_firc, n.sims = NUMSAMP)
+    fixef_samps_firc <- coef(sim_firc)[["fixef"]][,"Z"]
+    ranef_samps_firc <- coef(sim_firc)[["ranef"]]$sid[,,"Z"]
+    
+    res_firc2 <- tibble(
+      sid = as.character(1:J),
+      ATEhat = ATEhat_firc,
+      SE = apply(ranef_samps_firc, 2, function(x) sd(x + fixef_samps_firc))
+    ) %>%
+      cbind(t(apply(ranef_samps_firc, 2, 
+                    function(x) quantile(x + fixef_samps_firc, probs=QUANTILES)))) %>%
+      as_tibble(.name_repair = "minimal")
+    names(res_firc2) <- c("sid", paste0(NAME_VEC, "_firc2"))
+    
+    # RIRC model #1 (via generic arm package functions)
+    mod_rirc = lmer( Yobs ~ 1 + Z + (1+Z|sid), data=dat )
+    
+    ATEhat_rirc <- coef(mod_rirc)$sid$Z
+    SE_rirc1 <- sqrt(se.fixef(mod_rirc)["Z"]^2 + se.ranef(mod_rirc)$sid[,"Z"]^2)
+    
+    res_rirc1 <- tibble(sid = as.character(1:J),
+                        ATEhat = ATEhat_rirc,
+                        SE = SE_rirc1) %>%
+      rowwise() %>%
+      mutate(q = list(ATEhat + qnorm(QUANTILES) * SE)) %>%
+      unnest(cols = q) %>%
+      group_by(sid) %>%
+      mutate(quantile = QUANTILES) %>%
+      ungroup() %>%
+      pivot_wider(names_from = quantile, values_from = q, 
+                  names_prefix = "q")
+    names(res_rirc1) <- c("sid", paste0(NAME_VEC, "_rirc1"))
+    
+    # RIRC model #2 (via arm package sampling functions)
+    
+    # grabbing arm package samples
+    sim_rirc <- sim(mod_rirc, n.sims = NUMSAMP)
+    fixef_samps_rirc <- coef(sim_rirc)[["fixef"]][,"Z"]
+    ranef_samps_rirc <- coef(sim_rirc)[["ranef"]]$sid[,,"Z"]
+    
+    res_rirc2 <- tibble(
+      sid = as.character(1:J),
+      ATEhat_rirc2 = ATEhat_rirc,
+      SE_rirc2 = apply(ranef_samps_rirc, 2, function(x) sd(x + fixef_samps_rirc))
+    ) %>%
+      cbind(t(apply(ranef_samps_rirc, 2, 
+                    function(x) quantile(x + fixef_samps_rirc, probs=QUANTILES)))) %>%
+      as_tibble(.name_repair = "minimal")
+    names(res_rirc2) <- c("sid", paste0(NAME_VEC, "_rirc2"))
+    
+  }
   
   ### run bayesian multilevel models
   
@@ -227,14 +230,16 @@ one_sim <- function(nbar, J, tau, ICC, tx_sd,
   
   ##### compile results #####
   
-  # compile results for overall tau
-  mod_pooled <- lm(Yobs ~ 0 + as.factor(sid) + Z, data=dat)   # use pooled model
-  res_overall <- tibble(
-    method = c("FIRC", "RIRC", "Bayes", "Single"),
-    ATEhat = c(fixef(mod_firc)["Z"], fixef(mod_rirc)["Z"],
-               mean(samples_norm$pop_mn), coef(mod_pooled)["Z"]),
-    SE     = c(se.fixef(mod_firc)["Z"], se.fixef(mod_rirc)["Z"],
-               sd(samples_norm$pop_mn), summary(mod_pooled)$coef["Z",2]))
+  if (F) {
+    # compile results for overall tau
+    mod_pooled <- lm(Yobs ~ 0 + as.factor(sid) + Z, data=dat)   # use pooled model
+    res_overall <- tibble(
+      method = c("FIRC", "RIRC", "Bayes", "Single"),
+      ATEhat = c(fixef(mod_firc)["Z"], fixef(mod_rirc)["Z"],
+                 mean(samples_norm$pop_mn), coef(mod_pooled)["Z"]),
+      SE     = c(se.fixef(mod_firc)["Z"], se.fixef(mod_rirc)["Z"],
+                 sd(samples_norm$pop_mn), summary(mod_pooled)$coef["Z",2]))
+  }
   
   # browser()
   
@@ -242,17 +247,17 @@ one_sim <- function(nbar, J, tau, ICC, tx_sd,
   res_sites <- as_tibble(sdat) %>%
     dplyr::select(sid, n, ATE = beta.1) %>%
     left_join(res_single, by="sid") %>%
-    left_join(res_firc1, by="sid") %>%
-    left_join(res_firc2, by="sid") %>%
-    left_join(res_rirc1, by="sid") %>%
-    left_join(res_rirc2, by="sid") %>%
+    # left_join(res_firc1, by="sid") %>%
+    # left_join(res_firc2, by="sid") %>%
+    # left_join(res_rirc1, by="sid") %>%
+    # left_join(res_rirc2, by="sid") %>%
     left_join(res_bayesnorm, by="sid") %>%
-    mutate(is_singular_firc = isSingular(mod_firc), # is FIRC model singular?
-           is_singular_rirc = isSingular(mod_rirc), # is RIRC model singular?
+    mutate(# is_singular_firc = isSingular(mod_firc), # is FIRC model singular?
+           # is_singular_rirc = isSingular(mod_rirc), # is RIRC model singular?
            ESS_low = more_samples)                  # low ESS warning from rstan?
   
-  return(list(overall = res_overall, sites = res_sites))
-  # return(res_sites)
+  # return(list(overall = res_overall, sites = res_sites))
+  return(list(sites = res_sites))
 }
 
 
@@ -265,8 +270,8 @@ if ( F ) {
     dplyr::select(sid, method, ATEhat) %>%
     mutate(method = str_sub(method, 8))
   SEs <- os %>%
-    mutate(SE_firc = sqrt(SE_firc_fixed^2 + SE_firc_rand^2),
-           SE_rirc = sqrt(SE_rirc_fixed^2 + SE_rirc_rand^2)) %>%
+    # mutate(SE_firc = sqrt(SE_firc_fixed^2 + SE_firc_rand^2),
+    #        SE_rirc = sqrt(SE_rirc_fixed^2 + SE_rirc_rand^2)) %>%
     pivot_longer(contains("SE_"), names_to = "method", values_to = "SE") %>%
     dplyr::select(sid, method, SE) %>%
     mutate(method = str_sub(method, 4))

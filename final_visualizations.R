@@ -16,7 +16,7 @@ tidy_results <- tidy_results %>%
 
 
 TAU_FIXED <- 0.2
-J_FIXED <- 100
+J_FIXED <- 25
 
 # firc1 is using se.fixef + se.ranef, firc2 uses arm() samples
 tidy_results_sm <- tidy_results %>%
