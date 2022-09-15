@@ -56,7 +56,7 @@ NUMSIM <- 500   # J * number of simulations = NUMSIM; must be greater than max(J
 #   tx_sd  = c(0.1, 0.2, 0.3)
 # )
 df_sim <- expand_grid(
-  nbar   = seq(5,100,5),
+  nbar   = seq(5,200,5),
   # nbar   = c(25, 50),
   J      = c(25),
   ICC    = c(0.2),
