@@ -61,7 +61,7 @@ df_sim <- expand_grid(
   J      = c(25),
   ICC    = c(0.2),
   tau    = c(0.2),
-  tx_sd  = c(0.2)
+  tx_sd  = c(0.3)
 )
 
 if (PARALLEL) {
