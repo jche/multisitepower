@@ -118,7 +118,6 @@ We then suggest a potential path forward.
 We conduct a simulation study to explore power for individual site-level effects.
 We repeatedly simulate data under a normal hierarchical model where we vary four data-generating parameters: the average size of each site $\bar{n}$, the number of sites $J$, the true overall average treatment effect $\tau$, and the true cross-site variation in site-level effects $\sigma^2_\tau$.
 For each simulated dataset, we run four models: a normal Bayesian hierarchical model; a fixed-intercept, random-coefficients (FIRC) model \citep{bloom2017using}; a random-intercepts, random-coefficients (RIRC) model; and a separate t-test for each site. 
-Finally, we record each model’s estimates of site-level effects and their associated credible intervals.
 
 \section{Findings/Results}
 
@@ -153,11 +152,11 @@ Finally, we record each model’s estimates of site-level effects and their asso
 
 % \newpage
 
-In a traditional power analysis, the analyst posits an effect size $c$ and computes power (at level $\alpha$), possibly for a range of sample sizes.
+In a traditional power analysis, the analyst posits an effect size $c$ and computes power (at level $\alpha$).
 An analogous procedure for site-level effects in a multisite trial would be to fix a true site-level effect $c$ and compute power as the probability of rejecting the null when the true site-level effect is $c$.
 Figure \ref{fig:power_plot} visualizes the results of a power simulation under this setup.
-The power of a one-sided hypothesis test for a positive effect ($\alpha = 0.1$) is plotted against the true site-level effect size $\tau_j$.
-Ideally, the power curves would all be less than $\alpha = 0.1$ for $\tau_j \leq 0$ to ensure test validity and as high as possible for $\tau_j > 0$ to maximize test power.
+The power of a one-sided hypothesis test for a positive effect is plotted against the true site-level effect size $\tau_j$.
+Ideally, the power curves would be less than $\alpha = 0.1$ for $\tau_j \leq 0$ to ensure test validity and high for $\tau_j > 0$ to maximize test power.
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{power_plot_J100}
@@ -179,7 +178,8 @@ This naturally results in interval undercoverage (and falsely inflated power) fo
 \end{figure}
 
 In other words, MLMs have poor Frequentist coverage properties for fixed $\tau_j$ values, unlike running separate t-tests for each site.
-Even when MLMs are well-specified (as they are in our simulations), their Bayesian credible intervals on $\hat{\tau}_j$ are designed to have proper Empirical Bayes coverage rates for $\tau_j$ \textit{on average}, across the prior distribution of true $\tau_j$ values, and not for any single, fixed $\tau_j$ value.\footnote{We note that in our simulations, Bayesian intervals indeed achieve roughly nominal Empirical Bayes coverage rates in most cases, except when shrinkage is very strong (e.g., low $\bar{n}$ and low $\sigma_\tau$).}
+Even when MLMs are well-specified (as they are in our simulations), their Bayesian credible intervals on $\hat{\tau}_j$ are designed to have proper Empirical Bayes coverage rates for $\tau_j$ \textit{on average}, across the prior distribution of true $\tau_j$ values, and not for any single, fixed $\tau_j$ value.
+%\footnote{We note that in our simulations, Bayesian intervals indeed achieve roughly nominal Empirical Bayes coverage rates in most cases, except when shrinkage is very strong (e.g., low $\bar{n}$ and low $\sigma_\tau$).}
 A naive power analysis that posits an effect size $\tau_j^*$ that the analyst would like to detect therefore leads to unsatisfactory results, since Bayesian notions of power and coverage are not defined conditional on fixed values of $\tau_j$.
 
 Instead of naive Frequentist power analyses, we propose that analysts may conduct prospective interval-length analyses.
@@ -192,33 +192,7 @@ Figure \ref{fig:length_plot} demonstrates an example of this analysis.
 	\label{fig:length_plot}
 \end{figure}
 We see that using MLMs significantly decreases average interval length, particularly when $\sigma_\tau$ is small (i.e., shrinkage is high).
-If, for example, an interval length of 0.4 is desired, and treatment-effect variation is expected to be moderate ($\sigma_\tau$
-
-
-Given a posited average and spread of the true site-level effects $\tau_j$, an analyst could proceed to size a study so that an appropriate MLM would produce credible intervals of a desired average length.
-
-
-The credible intervals produced by MLMs have nominal coverage rates, provided that one does not condition on any particular true $\tau_j$ value.
-
-
-This means that 
-
-We can tell a site: "hey, we think that intervals for your site would be this wide -- would that be helpful?"
-
-
-, across sites; this means that when you give a site an interval, you can say that its coverage is 90\% ().
-
-
-You give a site a credible interval,
-you note that the interval has 90\% coverage, since sites are exchangeable.
-
-The credible intervals produced by an MLM analysis 
-
-For each site, the credible interval will cover the site's true effect at roughly 90\%.
-
-Given a site, the interval will cover at roughly the stated percent.
-When powering a study, don't think about inputting an effect size that you'd like to detect, since that doesn't make sense.
-
+If, for example, an interval length of 0.4 is desirable for site stakeholders and treatment-effect variation is expected to be moderate ($\sigma_\tau$ = 0.2), an analyst may note that the 100 sites would have to reasonably large ($\bar{n} \approx 250$) in order to achieve the desired interval length on average.
 
 % MLMs, however, have excellent coverage properties and power \textit{for fixed $\hat{\tau}_j$ values} when they are well-specified.
 % Figure \ref{fig:power_plot_cond} replicates Figure \ref{fig:power_plot}, except now test powers (i.e., rejection rates) are computed for fixed $\hat{\tau}_j$ values rather than for fixed $\tau_j$ values.
@@ -245,22 +219,11 @@ When powering a study, don't think about inputting an effect size that you'd lik
 
 \section{Conclusions}
 
-In many multisite trials, practitioners often wish to use the estimates produced by MLMs to conduct inference on treatment effects at individual sites.
-The credible intervals generated by MLMs, however, only guarantee average coverage rates across all sites, and not for a particular site with a true treatment effect $\tau_j$.
-As a result, Frequentist power analyses for fixed $\tau_j$ values indicate that while MLMs have more power for detecting effects at individual sites than does separately testing each site, they are generally invalid.
-
-If we insist on using the credible intervals generated by MLMs for individual site estimates, we may instead consider power and coverage conditional on the estimated site-level effects $\hat{\tau}_j$.
-For example, an analyst may posit a value for an estimated site-level effect $c$ and compute power for sites with $\hat{\tau}_j = c$.
-This alternative framing highlights the benefits of shrinkage for individual site-level effect estimates, shifting the questions to two key considerations.
-In particular, this framing shows that we can generally take the shrunken confidence intervals as a Bayesian probabilistic statement: we can say the interval around an observed $\hat{\tau}_j$ has a specified chance of containing the true $\tau_j$ over the randomness of estimation and the cross-site impact variation.
-\cmntM{Is this last part right?  I am not sure what we mean by coverage conditional on the estimated impact.  Aren't CIs always centered on estimated impact, ideally capturing the truth?  So I would expect coverage to deteriorate?  I've tangled myself up.}
-
-
-\cmntM{ I think the power curves conditional on $\hat{\tau}_j$ are hard to think about.  They show the chance of an observed shrunken estimate corresponding to an interval that excludes 0?  I.e., we can say to a practioner, if the final adjusted impact is 0.3 or above, then there is a 80\% chance that the corresponding CI will exclude 0?  We would do this for a given hypothesized ATE and impact variation, and thus have a sense of whether observed estimates of a given size of interest will be significant.  The emperical MDES (or something) would then be the threshold adjusted size that we would deem significant.  It makes me think that we should instead be asking questions along the lines of false discovery rate or something, e.g., what fraction of sites with a size above some threshold will be tagged as good.  Which takes us back to the true $\tau_j$.  We have two pieces here: how to think about the CIs, etc., and how to think about power.  I think they are separate.   Anyway, all of this is stuff to ponder.
-
-For the abstract, I think we are there, but we should have a but more of the motivation of what someone does with this.  I.e., explicitly say we provide the thinking about how to discuss and calculate power for individual sites, as well as give a simulation to see how diferent approaches can break down.
-
-E.g., we should say that we show classic MLM approaches seem to be very bad if used naively, given typical well-powered studies, if cross site variation turns out to be small. (?)}
+In many multisite trials, analysts may wish to power the trial to allow consistent detection of particular effect sizes at individual sites.
+The credible intervals generated by MLMs, however, only guarantee average coverage rates across all sites, and not for sites with a fixed effect size $\tau_j$.
+As a result, naive Frequentist power analyses for fixed $\tau_j$ values indicate that while MLMs have more power for detecting effects at individual sites than does separately testing each site, they are generally invalid.
+Rather than performing naive Frequentist power analyses, analysts may consider running average-interval-length analyses.
+Using the simulation framework in this paper, analysts may size a prospective study to achieve an average interval-length that stakeholders would be satisfied with for their individual site-level inferences.
 
 
 \bibliography{refs.bib}
