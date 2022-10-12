@@ -358,7 +358,7 @@ ggsave("results_sree/interval_length.png", width=4, height=2.5)
 
 
 
-# crazy shrinkage plot thing ----------------------------------------------
+# shrinkage plot thing ----------------------------------------------------
 
 source("simulation_functions.R")
 require(rstan)
