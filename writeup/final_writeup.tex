@@ -139,52 +139,66 @@ Is the notion of power induced by the definition of empirical Bayes coverage use
 In the sections that follow, we conduct a simulation study to clarify the statistical properties of empirical Bayes and Bayesian interval estimates for multisite trials, which in turn helps to answer these questions and provide a practical path forward.
 
 
-\subsection{A note on coverage}
-
-Before conducting power analyses for the site-level treatment effects $\tau_j$ in multisite trials, we first clarify some details about interval estimation of $\tau_j$.
-In a single-site randomized trial, we can simply use asdf.
-Under asdf, the resulting confidence interval will contain the site's true treatment effect $100(1-\alpha)$\% of the time, across (hypothetical) repeated trials.
-
-Shrinkage makes things funky.
-
-
-
-First talk about t-test intervals.
-
-
-Adding shrinkage makes things funky
-
-Talk about parametric stuff: when parametric model is well-specified, we focus on EB coverage.
-
-There is an extensive literature concerning the construction of such intervals for site-level treatment effects under shrinkage \citep{casella2012shrinkage}.
-These intervals typically possess a so-called empirical Bayes coverage property \citep{morris1983parametric}, which guarantees $100(1-\alpha)$\% coverage across the collection of $\tau_j$ values for all $J$ sites, rather than $100(1-\alpha)$\% coverage for each individual site.
-
-[This property holds when parametric model is well-specified for parametric stuff, and more generally for nonparametric stuff.]
-
-As we will illustrate shortly via simulation, this property leads to unusual conclusions for site stakeholders who would like to understand the effect of an experimental treatment at their particular site.
-
-
-
-
-
-
-This differs from standard Frequentist notions of coverage, which guarantee coverage conditional on each $\tau_j$.
-While there exist methods that do coverage conditional on $\tau_j$, it is difficult to do much better than the usual two-sample t-test in those situations.
-
-
-
-
-
-These guarantees may not be sufficient for stakeholders in multisite trials who would like to understand the effect of an experimental treatment at their particular site.
-Overall, the question of inference for individual $\tau_j$ values in multilevel models remains fairly open \citep{armstrong2020robust}, with limited guidance about best practices.
-
 \section{Simulation study}
 
 \subsection{Simulation setup}
 
+For our simulation study, we repeatedly simulate data from a multisite trial and estimate the site-level treatment effects $\tau_j$.
+We simulate multisite trial data using the \texttt{blkvar} package in R.
+Specifically, we sample observed outcomes $Y_{ij}$ for student $i$ in site $j$ as:
+\begin{align*}
+	Y_{ij} &= \alpha_j + \tau_j Z_{ij} + \epsilon_{ij} \\
+	\alpha_j &= \alpha + u_{0j} \\
+	\tau_j &= \tau + u_{1j} \\
+	\begin{pmatrix}
+		u_{0j} \\ u_{1j}
+	\end{pmatrix} &\sim N\left(
+	\begin{pmatrix}
+		0 \\ 0
+	\end{pmatrix}, 
+	\begin{bmatrix}
+		\sigma^2_\alpha & \rho_{01} \\  & \sigma^2_\tau
+	\end{bmatrix}\right) \\
+	\epsilon_{ij} &\sim N(0, \sigma^2_y) ,
+\end{align*}
+where the $\alpha_j$ are random site-level intercepts and the $\tau_j$ are the true site-level treatment effects.
+We conduct the simulation in effect-size units, so $Var(Y_{ij} \mid Z_{ij}=0)=1$, i.e., $\sigma^2_\alpha + \sigma^2_y = 1$.
+We also set $\rho_{10}=1$ so the intercept and treatment random effects are uncorrelated.
+For simplicity, we condense the data within each site to a simple average treatment effect $\hat{\tau}_j = \frac{1}{\sum_i Z_{ij}} \sum_i Z_{ij}Y_{ij} - \frac{1}{\sum_i (1-Z_{ij})} \sum_i (1-Z_{ij})Y_{ij} $ and an estimated standard error $\text{s.e}_j$ before applying shrinkage estimators.\footnote{The estimated standard error varies depending on the method used to estimate site-level average treatment effects.
+We consider two estimators: put formulas, also should I use FIRC?}
+Our condensed data therefore takes the form:
+\begin{align*}
+    \hat{\tau}_j &\sim N(\tau_j, \text{s.e}_j), \ \ j=1,\dots,J \\
+    \tau_j &\sim N(\tau, \sigma_\tau^2).
+\end{align*}
+In the formal simulation study, we vary four data-generating parameters: the average size of each site $\bar{n}$, the number of sites $J$, the true overall average treatment effect $\tau$, and the true cross-site variation in site-level effects $\sigma^2_\tau$.
+[TODO: update previous sentence. Do we want to vary ICC?]
+
+We use two different methods to produce interval estimates for each site-level treatment effect.
+For a baseline comparison, we record interval estimates from two-sample t-tests, conducted separately for each site.
+We also record the interval estimates that result from a fully Bayesian model, with $G \sim N(\tau, \sigma^2)$, priors $\tau \sim N(0,5^2)$ and $\sigma \sim N(0,1)$, and site-level standard error estimates of asdf.
+We choose to use a fully Bayesian model for two reasons.
+First, Bayesian models provide a standard framework for model comparison, since many popular parametric empirical Bayes approaches are effectively equivalent to Bayesian models with particular priors.
+More importantly, though, Bayesian models naturally estimate intervals for the $\tau_j$ parameters.
+Standard parametric empirical Bayes procedures estimate intervals for the overall $\tau$ and $\sigma^2$ parameters, but they typically only produce point estimates of the $\tau_j$ parameters.
+While analysts can generate interval estimates for the $\tau_j$ parameters (e.g., via the bootstrap), it is not common practice, so standard software packages for running these models do not include this functionality.
+
+
 \subsection{Illustrating example}
 
+Before showing the results from the full simulation study, we first highlight some of the study's main ideas using a single simulation.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=\textwidth]{shrinkageplot}
+	\caption{Power (at $\alpha = 0.1$) vs. true site ATE}
+	\label{fig:example}
+\end{figure}
+
+
 \section{Simulation results}
+
+Now we look at what happens upon repeated simulation.
 
 \section{Case study}
 
