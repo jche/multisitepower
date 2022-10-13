@@ -88,7 +88,7 @@ Finally, in Section 5 we provide a useful template for a power analysis conducte
 \subsection{Mathematical framework}
 
 In a multisite trial, the same randomized trial is conducted within each of several sites.
-For example, [insert example].
+For example, [insert running example].
 Rather than separately estimating the treatment effect for each site, it is well known that shrinking the noisy site-level treatment-effect estimates toward an overall average produces a better collection of estimates in terms of mean-squared error \citep{james1961estimation}.
 For $J$ total sites, this shrinkage can be motivated by the following mathematical framework:
 \begin{align*}
@@ -113,25 +113,25 @@ Empirical Bayes random-effects and mixed-effects models are particularly popular
 The literature on random-effects meta-analysis \citep{higgins2009re} and empirical Bayes confidence interval methods \citep{morris1983parametric, he1992parametric, gene2009empirical} also contains many parametric procedures for problems similar to the analysis of multisite trials.
 Standard parametric methods assume $G \sim N(\mu, \sigma^2)$ for unknown mean and variance parameters $\mu$ and $\sigma^2$, which must then be estimated.
 Empirical Bayes and Bayesian methods differ in how they estimate these parameters.
-Empirical Bayes methods use maximum likelihood and/or restricted maximum likelihood approaches to estimate $\mu$ and $\sigma$.
+Empirical Bayes methods typically use maximum likelihood and/or restricted maximum likelihood approaches to estimate $\mu$ and $\sigma$.
 Fully Bayesian methods set parametric priors on $\mu$ and $\sigma$ and either analytically derive or use Monte Carlo Markov chain (MCMC) sampling to estimate their posterior distributions.
 
-In recent years, semi- and non-parametric methods have started to receive significant attention in the theoretical literature.
+In recent years, semi- and non-parametric methods for this problem have received significant attention in the theoretical literature.
 These methods avoid placing strong parametric assumptions on the distribution of $G$ while technically maintaining the statistical properties and computational feasibility of parametric methods.
-Semiparametric empirical Bayes procedures estimate $G$ from the data \citep{laird1987empirical, yu2018adaptive}, while nonparametric empirical Bayes methods assume a general class of distributions for $G$ \citep{ignatiadis2022confidence} or avoid distributional assumptions on $G$ entirely \citep{armstrong2020robust}.
+Semiparametric empirical Bayes procedures flexibly estimate $G$ from the data \citep{laird1987empirical, yu2018adaptive}, while nonparametric empirical Bayes methods assume a general class of distributions for $G$ \citep{ignatiadis2022confidence} or avoid distributional assumptions on $G$ entirely \citep{armstrong2020robust}.
 Nonparametric Bayesian methods place highly flexible priors on $G$, such as Dirichlet process priors (e.g., cite some DP stuff).
 
 In this paper, we focus on parametric empirical Bayes and Bayesian methods for analyzing multisite trials, since they are much more frequently used than their nonparametric counterparts.
 While parametric models are relatively simple, advice for conducting power analyses on them remains unclear, particularly for the estimation of individual site-level treatment effects.
-As such, we focus on clarifying the use of parametric models for this task and leave the evaluation of nonparametric methods to future work.
+We aim to clarify the use of parametric models for this task and leave the evaluation of nonparametric methods to future work.
 
 \subsection{Motivation}
 
 To conduct power analyses for the site-level treatment effects $\tau_j$ in multisite trials, we must first define coverage for the interval estimates of the $\tau_j$ values.
-In a single-site randomized trial, standard interval estimates will cover the site's true treatment effect $\tau$ $100(1-\alpha)$\% of the time for some given significance level $\alpha$, across (hypothetical) repeated trials.
+In a single-site randomized trial, standard interval estimates will cover the site's true treatment effect $100(1-\alpha)$\% of the time for some given significance level $\alpha$, across (hypothetical) repeated trials.
 Because of shrinkage, the interval estimates produced by empirical Bayes and Bayesian procedures generally do not have this property for the site-level treatment effects $\tau_j$ in multisite trials.\footnote{Some interval estimates, such as those proposed by \citet{yu2018adaptive}, satisfy coverage for each $\tau_j$, but these types of interval estimates are not common in the literature.}
 Instead, these intervals typically possess a so-called empirical Bayes coverage property \citep{morris1983parametric}, which guarantees $100(1-\alpha)$\% coverage across the collection of $\tau_j$ values for all $J$ sites, rather than $100(1-\alpha)$\% coverage for each individual site.
-In particular, shrinkage induces the intervals generated by these procedures to overcover for values of $\tau_j$ close to the overall mean, and undercover for values far from the mean \citep{snijders2011multilevel}.
+In particular, shrinkage induces the intervals generated by these procedures to overcover for values of $\tau_j$ close to the overall mean and undercover for values far from it \citep{snijders2011multilevel}.
 
 While this behavior is fairly well-understood in a statistical sense, it can lead to practical confusion for site stakeholders and research analysts alike.
 For example, what should a site stakeholder expect from the final interval estimate for their particular site?
@@ -164,6 +164,7 @@ Specifically, we sample observed outcomes $Y_{ij}$ for student $i$ in site $j$ a
 where the $\alpha_j$ are random site-level intercepts and the $\tau_j$ are the true site-level treatment effects.
 We conduct the simulation in effect-size units, so $Var(Y_{ij} \mid Z_{ij}=0)=1$, i.e., $\sigma^2_\alpha + \sigma^2_y = 1$.
 We also set $\rho_{10}=1$ so the intercept and treatment random effects are uncorrelated.
+
 For simplicity, we condense the data within each site to a simple average treatment effect $\hat{\tau}_j = \frac{1}{\sum_i Z_{ij}} \sum_i Z_{ij}Y_{ij} - \frac{1}{\sum_i (1-Z_{ij})} \sum_i (1-Z_{ij})Y_{ij} $ and an estimated standard error $\text{s.e}_j$ before applying shrinkage estimators.\footnote{The estimated standard error varies depending on the method used to estimate site-level average treatment effects.
 We consider two estimators: put formulas, also should I use FIRC?}
 Our condensed data therefore takes the form:
@@ -174,31 +175,86 @@ Our condensed data therefore takes the form:
 In the formal simulation study, we vary four data-generating parameters: the average size of each site $\bar{n}$, the number of sites $J$, the true overall average treatment effect $\tau$, and the true cross-site variation in site-level effects $\sigma^2_\tau$.
 [TODO: update previous sentence. Do we want to vary ICC?]
 
-We use two different methods to produce interval estimates for each site-level treatment effect.
-For a baseline comparison, we record interval estimates from two-sample t-tests, conducted separately for each site.
-We also record the interval estimates that result from a fully Bayesian model, with $G \sim N(\tau, \sigma^2)$, priors $\tau \sim N(0,5^2)$ and $\sigma \sim N(0,1)$, and site-level standard error estimates of asdf.
+We apply two different methods to produce interval estimates for each site-level treatment effect.
+For a baseline comparison, we record 90\% confidence intervals on $\tau_j$ from single-site t-tests, conducted separately at each site (``Single'').
+We also record the 90\% credible intervals on $\tau_j$ from a fully Bayesian multilevel model (``MLM''), with $G \sim N(\tau, \sigma^2)$, priors $\tau \sim N(0,5^2)$ and $\sigma \sim N(0,1)$, and site-level standard error estimates of [FIRC or fully pooled or what?].
 We choose to use a fully Bayesian model for two reasons.
-First, Bayesian models provide a standard framework for model comparison, since many popular parametric empirical Bayes approaches are effectively equivalent to Bayesian models with particular priors.
+First, Bayesian models provide a standard framework for model comparison, since many popular parametric empirical Bayes approaches are equivalent to Bayesian models with particular priors.
 More importantly, though, Bayesian models naturally estimate intervals for the $\tau_j$ parameters.
 Standard parametric empirical Bayes procedures estimate intervals for the overall $\tau$ and $\sigma^2$ parameters, but they typically only produce point estimates of the $\tau_j$ parameters.
-While analysts can generate interval estimates for the $\tau_j$ parameters (e.g., via the bootstrap), it is not common practice, so standard software packages for running these models do not include this functionality.
+While analysts can generate interval estimates for the $\tau_j$ parameters (e.g., via the bootstrap), it is not common practice and standard software packages do not include this functionality.
 
+\subsection{Illustrative example}
 
-\subsection{Illustrating example}
-
-Before showing the results from the full simulation study, we first highlight some of the study's main ideas using a single simulation.
-
+Before showing the results from the full simulation study, we highlight some of the study's main ideas using a single simulation.
+For 100 simulated $\tau_j$ values, Figure \ref{fig:shrinkageplot} shows the 90\% interval estimates produced by the Bayesian multilevel model and single-site t-tests.
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{shrinkageplot}
-	\caption{Power (at $\alpha = 0.1$) vs. true site ATE}
-	\label{fig:example}
+	\caption{Interval estimates for one simulated dataset. Intervals overlapping the dotted line cover their respective true $\tau_j$ values.}
+	\label{fig:shrinkageplot}
 \end{figure}
+In this simulation, 90 of the MLM intervals and 91 of the single-site intervals contain their respective true $\tau_j$ values.
+
+The two methods, however, achieve this $\approx$ 90\% coverage in different ways.
+As seen in Figure \ref{fig:shrinkageplot}, the MLM shrinks its point estimates toward the overall average.
+This shrinkage improves coverage for moderate $\tau_j$ values, but causes the MLM to overestimate the lowest $\tau_j$ values and underestimate the highest $\tau_j$ values.
+For example, Figure \ref{fig:shrinkageplot_slice1} highlights the intervals for sites with true $\tau_j \approx 0.6$.
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\textwidth]{shrinkageplot_slice1}
+	\caption{Interval estimates for one simulated dataset. Intervals for $\tau_j \approx 0.6$} are highlighted.
+	\label{fig:shrinkageplot_slice1}
+\end{figure}
+While the single-site intervals are randomly scattered around the dotted line, shrinkage pulls the MLM intervals downward, causing many of them to fail to cover.
+
+On the other hand, shrinkage ensures that when an MLM estimates that a site has a relatively extreme value of $\tau_j$, the site's true $\tau_j$ value is indeed likely to be extreme.
+Figure \ref{fig:shrinkageplot_slice3} replicates Figure \ref{fig:shrinkageplot_slice1}, now highlighting intervals for sites with large estimated site-level treatment effects ($\hat{\tau}_j \approx 0.55$).
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\textwidth]{shrinkageplot_slice3}
+	\caption{Interval estimates for one simulated dataset. Intervals for $\hat{\tau}_j \approx 0.55$ are highlighted.}
+	\label{fig:shrinkageplot_slice3}
+\end{figure}
+We notice that the large MLM estimates are more clustered toward the right-hand side of the plot than are the large single-site estimates.
+In other words, the large MLM estimates are more likely to correspond to truly large values of $\tau_j$.
+The full simulation study more precisely quantifies these ideas of coverage for each $\tau_j$ value and coverage for each $\hat{\tau}_j$ value.
+
+
+[OPEN Q: maybe use this to motivate average MDES, and just use average MDES as the metric in the full simulation studies (varying J, ICC, etc.)]
 
 
 \section{Simulation results}
 
-Now we look at what happens upon repeated simulation.
+We simulate 1000 multisite trial datasets and summarize the results in the figures below.
+In a traditional power analysis, the analyst posits an effect size $c$ and computes power for that effect size.
+An analogous procedure for the site-level treatment effects in a multisite trial is to compute power for each true site-level treatment effect size $\tau_j$.
+Figure \ref{fig:power_plot} visualizes the results of a power simulation under this setup.\footnote{For clarity, we round the true site-level treatment effects $\tau_j$ to the nearest 0.05 prior to simulating site-level data, and we only visualize the power curves for $\tau_j =$ 0, 0.2, and 0.4.}
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=\textwidth]{power_plot_J100}
+	\caption{Power (at $\alpha = 0.1$) vs. true site ATE}
+	\label{fig:power_plot}
+\end{figure}
+Figure \ref{fig:power_plot} plots the average rejection rate against the average site size for sites with $\tau_j =$ 0, 0.2, and 0.4.
+Clearly, MLMs improve power relative to the single-site interal estimates.
+Unfortunately, we also notice that when $\tau_j = 0$, shrinkage causes MLMs to make false rejections at a rate higher than $\alpha=0.1$.
+As previously noted, this is due to the fact that the interval estimates produced by MLMs undercover extreme values of $\tau_j$ (Figure \ref{fig:coverage_plot}).
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=\textwidth]{power_plot_J100}
+	\caption{Power (at $\alpha = 0.1$) vs. true site ATE}
+	\label{fig:coverage_plot}
+\end{figure}
+
+We can also consider what happens if we condition on estimated site-level treatment effects $\hat{\tau}_j$.
+[TODO: insert other plots]
+
+
+\subsection{Conclusions}
+
+Note: No matter what, we achieve coverage across intervals: this is “empirical Bayes” coverage, extra nice if it’s robust to the data-generating model (mention some other papers here)
+
 
 \section{Case study}
 
