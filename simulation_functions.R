@@ -360,18 +360,50 @@ run_t_test <- function(df, NAME_VEC = NAME_VEC) {
 # make df with site-level summaries for rstan functions
 make_site_summaries <- function( df ) {
 
-  df %>%
+  # To estimate sigma_1 and sigma_0:
+  #  1. center outcomes within each site
+  #  2. take sd of pooled data across all sites.
+  # IDEA: remove cross-site intercept variation
+  sds <- df %>%
     group_by(sid, Z) %>%
+    mutate(Yobs = Yobs-mean(Yobs)) %>%
+    ungroup() %>%
+    group_by(Z) %>%
+    summarize(sigma = sd(Yobs))
+  sd1 <- sds %>% 
+    filter(Z==1) %>% 
+    pull(sigma)
+  sd0 <- sds %>% 
+    filter(Z==0) %>% 
+    pull(sigma)
+  
+  df %>% 
+    group_by(sid, Z) %>% 
     summarize(ybar = mean(Yobs),
               n = n(),
-              V = var(Yobs),
-              .groups = "drop_last") %>%
-    pivot_wider(names_from = "Z", 
-                values_from = ybar:V, 
-                names_sep = ".") %>%
-    ungroup() %>%
-    mutate(pool.se2 = sum( V.1 * (n.1-1) + V.0 * (n.0-1) ) / sum( n.1 + n.0 - 2 ),
-           tau.hat = ybar.1 - ybar.0,
-           SE = sqrt(pool.se2 / n.1 + pool.se2 / n.0))
+              .groups = "drop_last") %>% 
+    pivot_wider(names_from = "Z",
+                values_from = c("ybar", "n"),
+                names_sep = ".") %>% 
+    ungroup() %>% 
+    mutate(tau.hat = ybar.1 - ybar.0,
+           SE = sqrt(sd1^2 / n.1 + sd0^2 / n.0))
+  
+  # # TODO: in theory, we'd want to estimate sigma_1 and sigma_0 separately.
+  # #  - in practice, we simulate data without separate sigma_1 and sigma_0 values.
+  # #  - CONCLUSION: it's not really necessary to separately estimate them...?
+  # df %>%
+  #   group_by(sid, Z) %>%
+  #   summarize(ybar = mean(Yobs),
+  #             n = n(),
+  #             V = var(Yobs),
+  #             .groups = "drop_last") %>%
+  #   pivot_wider(names_from = "Z",
+  #               values_from = ybar:V,
+  #               names_sep = ".") %>%
+  #   ungroup() %>%
+  #   mutate(pool.se2 = sum( V.1 * (n.1-1) + V.0 * (n.0-1) ) / sum( n.1 + n.0 - 2 ),
+  #          tau.hat = ybar.1 - ybar.0,
+  #          SE = sqrt(pool.se2 / n.1 + pool.se2 / n.0))
 }
 

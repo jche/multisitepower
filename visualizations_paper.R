@@ -1,11 +1,89 @@
 
 require(tidyverse)
 require(ggthemes)
-# require(wesanderson)
+require(wesanderson)
 require(latex2exp)
 require(rstan)
 
-# pal <- wes_palette("Zissou1", 5, type="continuous")
+pal <- wes_palette("Zissou1", 5, type="continuous")
+
+
+
+# analyzing simulation results --------------------------------------------
+
+tidy_results <- read_csv("results_sree/sree_sims.csv") %>% 
+  mutate(reject_one = q10 >= 0,
+         covered_one = q10 <= ATE,
+         reject_two = q5 >= 0 | q95 <= 0,
+         covered_two = (q5 <= ATE) & (ATE <= q95)) %>%
+  mutate(ATEhat_bin = plyr::round_any(ATEhat, 0.05),
+         method = case_when(
+           method == "bayesnorm" ~ "MLM",
+           method == "single" ~ "Single"))
+
+
+### MDES
+
+tidy_results %>%
+  filter(tx_sd == 0.2) %>%
+  group_by(nbar, J, ICC, tau, tx_sd, method, ATE) %>% 
+  summarize(n = n(),
+            power = mean(reject_two)) %>%
+  filter(n >= 50, power >= 0.8) %>%
+  summarize(MDES = min(ATE)) %>%   # minimum ATE s.t. power >= 0.8
+  ggplot(aes(x=nbar, y=MDES, color=method)) +
+  geom_point() +
+  geom_line()
+
+### average MDES
+
+# not defined
+
+
+### average power
+
+# in theory, maximum power should be 1-qnorm(0, 0.2, 0.2) = 0.84
+tidy_results %>% 
+  filter(tx_sd == 0.2) %>%
+  # filter(method == "MLM") %>% 
+  group_by(nbar, J, ICC, tau, tx_sd, method) %>% 
+  summarize(power = mean(reject_two)) %>% 
+  ggplot(aes(x=nbar, y=power, color=method)) +
+  geom_point(alpha=0.5) +
+  geom_line(aes(group=method), size=1) +
+  scale_color_manual(values = c(pal[5], pal[1])) +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_minimal() +
+  theme(axis.line = element_line()) +
+  labs(y = "Average power",
+       x = "Average site size",
+       color = "Method",
+       pch = TeX("$\\sigma^2$ value"))
+
+# "true" power, only for tau_j != 0
+tidy_results %>% 
+  filter(tx_sd == 0.2, ATE != 0) %>%
+  # filter(method == "MLM") %>% 
+  group_by(nbar, J, ICC, tau, tx_sd, method) %>% 
+  summarize(power = mean(reject_two)) %>% 
+  ggplot(aes(x=nbar, y=power, color=method)) +
+  geom_point(alpha=0.5) +
+  geom_line(aes(group=method), size=1) +
+  scale_color_manual(values = c(pal[5], pal[1])) +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_minimal() +
+  theme(axis.line = element_line()) +
+  labs(y = "Average power",
+       x = "Average site size",
+       color = "Method",
+       pch = TeX("$\\sigma^2$ value"))
+
+
+
+
+
+
+# illustrative example ----------------------------------------------------
 
 source("simulation_functions.R")
 

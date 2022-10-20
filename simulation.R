@@ -29,7 +29,7 @@ options(dplyr.summarise.inform = FALSE)
 
 # initialize parallel backend
 #  - good tutorial: https://www.blasbenito.com/post/02_parallelizing_loops_with_r/
-PARALLEL <- T
+PARALLEL <- F
 if (PARALLEL) {
   require(foreach)
   require(doParallel)
