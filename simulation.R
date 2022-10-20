@@ -125,11 +125,11 @@ if (PARALLEL) {
 # save results
 #####
 
-FNAME <- "sree_sims"
+FNAME <- "example"
 UUID  <- substr(UUIDgenerate(), 25, 36)
 
 # save site-level results
-fname <- glue("results_sree/{FNAME}-{UUID}.csv")
+fname <- glue("final_sims/{FNAME}-{UUID}.csv")
 # fname <- glue("revised_results/{FNAME}.csv")
 if (file.exists(fname)) {
   # ASSUMING that all sim settings are run equally

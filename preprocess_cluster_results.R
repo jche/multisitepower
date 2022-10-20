@@ -4,9 +4,9 @@
 require(tidyverse)
 require(glue)
 
-dir <- "results_sree"
+dir <- "final_sims"
 # dir <- "results2"   # results2 is ONLY J=20 cases
-fhead <- "sree_sims"
+fhead <- "example2"   # example is sd=0.3, example2 is sd=0.2
 
 all_files <- list.files(dir)
 
@@ -20,27 +20,11 @@ all_dfs <- all_files[str_detect(all_files, glue("{fhead}-"))] %>%
   })
 res <- bind_rows(all_dfs)
 
-if (F) {
-  max_runID <- 0
-  all_dfs_overall <- all_files[str_detect(all_files, glue("{fhead}_overall"))] %>%
-    map(function(fname) {
-      df <- read_csv(glue("{dir}/{fname}")) %>%
-        mutate(runID = runID + max_runID)
-      max_runID <<- max(df$runID)
-      df
-    })
-  res_overall <- bind_rows(all_dfs_overall)
-}
-
-
-
 rm(all_files)
 rm(all_dfs)
-rm(all_dfs_overall)
 
 
-
-if (F) {
+if (T) {
   hits <- res
   
   # Get ATEs per method (long data)
@@ -77,5 +61,6 @@ if (F) {
            q5 = q5s,
            q10 = q10s,
            q95 = q95s)
-  write_csv(tidy_results, "results_sree/sree_sims.csv")
+  
+  write_csv(tidy_results, glue("{dir}/{fhead}_full.csv"))
 }

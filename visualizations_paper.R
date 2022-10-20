@@ -11,7 +11,8 @@ pal <- wes_palette("Zissou1", 5, type="continuous")
 
 # analyzing simulation results --------------------------------------------
 
-tidy_results <- read_csv("results_sree/sree_sims.csv") %>% 
+# tidy_results <- read_csv("final_sims/example_full.csv") %>% 
+tidy_results <- read_csv("final_sims/example2_full.csv") %>%
   mutate(reject_one = q10 >= 0,
          covered_one = q10 <= ATE,
          reject_two = q5 >= 0 | q95 <= 0,
@@ -21,16 +22,14 @@ tidy_results <- read_csv("results_sree/sree_sims.csv") %>%
            method == "bayesnorm" ~ "MLM",
            method == "single" ~ "Single"))
 
-
 ### MDES
 
 tidy_results %>%
-  filter(tx_sd == 0.2) %>%
   group_by(nbar, J, ICC, tau, tx_sd, method, ATE) %>% 
   summarize(n = n(),
             power = mean(reject_two)) %>%
   filter(n >= 50, power >= 0.8) %>%
-  summarize(MDES = min(ATE)) %>%   # minimum ATE s.t. power >= 0.8
+  summarize(MDES = min(abs(ATE))) %>%   # minimum ATE s.t. power >= 0.8
   ggplot(aes(x=nbar, y=MDES, color=method)) +
   geom_point() +
   geom_line()
@@ -44,7 +43,6 @@ tidy_results %>%
 
 # in theory, maximum power should be 1-qnorm(0, 0.2, 0.2) = 0.84
 tidy_results %>% 
-  filter(tx_sd == 0.2) %>%
   # filter(method == "MLM") %>% 
   group_by(nbar, J, ICC, tau, tx_sd, method) %>% 
   summarize(power = mean(reject_two)) %>% 
@@ -62,7 +60,7 @@ tidy_results %>%
 
 # "true" power, only for tau_j != 0
 tidy_results %>% 
-  filter(tx_sd == 0.2, ATE != 0) %>%
+  filter(ATE != 0) %>%
   # filter(method == "MLM") %>% 
   group_by(nbar, J, ICC, tau, tx_sd, method) %>% 
   summarize(power = mean(reject_two)) %>% 
@@ -81,12 +79,139 @@ tidy_results %>%
 
 
 
+# SREE plots --------------------------------------------------------------
+
+### power vs. sample size 
+
+# conditioned on tau_j
+tidy_results %>% 
+  filter(ATE %in% c(0, 0.2, 0.4)) %>%
+  group_by(nbar, J, ICC, tau, tx_sd, ATE, method) %>% 
+  summarize(n = n(),
+            power = mean(reject_two)) %>% 
+  filter(n >= MIN_SIZE) %>% 
+  mutate(ATE = as.factor(ATE)) %>%
+  ggplot(aes(x=nbar, y=power, color = ATE)) +
+  geom_point(aes(size=n), alpha=0.1) +
+  geom_smooth(aes(group=ATE), se=F) +
+  geom_hline(aes(yintercept=0.1), lty="dashed") +
+  geom_hline(aes(yintercept=0.8), lty="dashed") +
+  facet_wrap(~ method, scales="free") +   # scales=free is hack to make axes appear
+  scale_color_manual(values=pal[c(1,3,5)],
+                     guide = guide_legend(reverse=T)) +
+  theme_minimal() +
+  theme(axis.line = element_line(),
+        panel.spacing = unit(2, "lines")) +
+  scale_x_continuous(limits=c(0, 200)) + 
+  scale_y_continuous(limits=c(0, 1)) +
+  labs(y = "Power",
+       x = "Average site size",
+       color = TeX("$\\tau_j$ value")) +
+  guides(size="none")
+ggsave("writeup/images/pp1.png")
+
+
+# conditioned on tau_hat_j
+#  - note: hard to compare between Bayes and Single, since
+#    range of tau_hat_j values is very different between them
+tidy_results %>% 
+  filter(ATEhat_bin %in% c(0, 0.2, 0.4)) %>%
+  group_by(nbar, J, ICC, tau, tx_sd, ATEhat_bin, method) %>% 
+  summarize(n = n(),
+            power = mean(reject_two)) %>% 
+  filter(n >= MIN_SIZE) %>% 
+  mutate(ATEhat_bin = as.factor(ATEhat_bin)) %>%
+  # # ensure that only tau-hats that occur for many nbars
+  # #  get geom_smoothed (to avoid errors)
+  # group_by(J, ICC, tau, tx_sd, ATEhat_bin, method) %>% 
+  # filter(n() >= 25) %>% 
+  ggplot(aes(x=nbar, y=power, color = ATEhat_bin)) +
+  geom_point(aes(size=n), alpha=0.2) +
+  # geom_line(aes(group=ATE)) +
+  geom_smooth(aes(group=ATEhat_bin), se=F) +
+  facet_wrap(~ method, scales="free") +
+  scale_color_manual(values=pal[c(1,3,5)],
+                     guide = guide_legend(reverse=T)) +
+  theme_minimal() +
+  theme(axis.line = element_line(),
+        panel.spacing = unit(2, "lines")) +
+  scale_x_continuous(limits=c(0, 200)) + 
+  scale_y_continuous(limits=c(0, 1)) +
+  labs(y = "Power",
+       x = "Average site size",
+       color = TeX("$\\hat{\\tau}_j$ value")) +
+  guides(size="none")
+ggsave("writeup/images/pp2.png")
+
+
+# coverage vs sample size -------------------------------------------------
+
+# conditioned on tau_j
+tidy_results %>% 
+  filter(ATE %in% c(0, 0.2, 0.4)) %>%
+  group_by(nbar, J, ICC, tau, tx_sd, ATE, method) %>% 
+  summarize(n = n(),
+            coverage = mean(covered_two)) %>% 
+  filter(n >= MIN_SIZE) %>% 
+  mutate(ATE = as.factor(ATE)) %>%
+  ggplot(aes(x=nbar, y=coverage, color = ATE)) +
+  geom_point(aes(size=n), alpha=0.1) +
+  # geom_line(aes(group=ATE)) +
+  geom_smooth(aes(group=ATE), se=F) +
+  geom_hline(aes(yintercept=0.9), lty="dashed", color="black") +
+  facet_wrap(~ method, scales="free") +
+  # scale_color_continuous(low="blue", high="orange") +
+  scale_color_manual(values=pal[c(1,3,5)],
+                     guide = guide_legend(reverse=T)) +
+  theme_minimal() +
+  theme(axis.line = element_line(),
+        panel.spacing = unit(2, "lines")) +
+  scale_x_continuous(limits=c(0, 200)) + 
+  scale_y_continuous(limits=c(0.5, 1)) +
+  labs(y = "Coverage",
+       x = "Average site size",
+       color = TeX("$\\tau_j$ value")) +
+  guides(size="none")
+ggsave("writeup/images/cp1.png")
+
+# conditioned on tau_hat_j
+tidy_results %>% 
+  filter(ATEhat_bin %in% c(-0.4, -0.1, 0.2, 0.5, 0.8)) %>%
+  group_by(nbar, J, ICC, tau, tx_sd, ATEhat_bin, method) %>%
+  summarize(n = n(),
+            coverage = mean(covered_two)) %>% 
+  filter(n >= MIN_SIZE) %>% 
+  mutate(ATEhat_bin = factor(ATEhat_bin)) %>%
+  
+  # ensure that enough points exist for geom_smooth() to work nicely
+  group_by(method, ATEhat_bin) %>% 
+  filter(n() >= 10) %>% 
+  
+  ggplot(aes(x=nbar, y=coverage, color = ATEhat_bin)) +
+  geom_point(aes(size=n), alpha=0.1) +
+  geom_smooth(aes(group=ATEhat_bin), se=F) +
+  geom_hline(aes(yintercept=0.9), lty="dashed", color="black") +
+  
+  facet_wrap(~ method, scales="free") +
+  scale_y_continuous(limits=c(0.5, 1)) +
+  scale_color_manual(# values=pal[c(1,3,5)],
+    values = pal,
+    guide = guide_legend(reverse=T)) +
+  theme_minimal() +
+  theme(axis.line = element_line()) +
+  labs(y = "Coverage",
+       x = "Average site size",
+       color = TeX("$\\hat{\\tau}_j$ value")) +
+  guides(size="none")
+ggsave("writeup/images/cp2.png")
+
+
 
 
 # illustrative example ----------------------------------------------------
 
+# run single simulation
 source("simulation_functions.R")
-
 set.seed(123)   # use this with J=100
 if (T) {
   QUANTILES <- c(0.05, 0.1, 0.95)
@@ -147,10 +272,7 @@ if (T) {
   names(res_bayesnorm) <- c("sid", paste0(NAME_VEC, "_bayesnorm"))
 }
 
-
-
-# plot --------------------------------------------------------------------
-
+# aggregate results
 spdf <- res_single %>% 
   mutate(method = "Single",
          tau = sdat$beta.1,
@@ -174,9 +296,6 @@ spdf %>%
   summarize(coverage = mean(tau <= q95 & tau >= q5))
 
 # tau_hat vs. tau
-YMIN1 <- 0.55
-YMAX1 <- 0.65
-
 spdf %>% 
   ggplot(aes(x=tau, y=tau_hat)) +
   geom_linerange(aes(ymin=q5, ymax=q95), alpha=0.3) +
@@ -191,6 +310,9 @@ spdf %>%
        x = TeX("True $\\tau_j$"))
 ggsave("writeup/images/shrinkageplot.png")
 
+# vertical slice
+YMIN1 <- 0.55
+YMAX1 <- 0.65
 spdf %>% 
   mutate(in_range = tau >= YMIN1 & tau <= YMAX1) %>%
   ggplot(aes(x=tau, y=tau_hat)) +
@@ -213,32 +335,7 @@ spdf %>%
        x = TeX("True $\\tau_j$"))
 ggsave("writeup/images/shrinkageplot_slice1.png")
 
-# YMIN2 <- 1
-# YMAX2 <- 1.5
-# spdf %>% 
-#   mutate(in_range = tau_hat >= YMIN2 & tau_hat <= YMAX2) %>%
-#   ggplot(aes(x=tau, y=tau_hat)) +
-#   geom_rect(aes(xmin=-Inf, xmax=Inf, ymin=YMIN2, ymax=YMAX2),
-#             fill = pal[1],
-#             alpha=0.01) +
-#   geom_linerange(aes(ymin=q5, ymax=q95,
-#                      alpha = ifelse(in_range, 1, 0.01))) +
-#   geom_point(aes(alpha = ifelse(in_range, 1, 0.01))) +
-#   geom_abline(lty = "dotted") +
-#   facet_wrap(~method, scales="free_y") +
-#   
-#   guides(alpha = "none",
-#          color = "none") +
-#   theme_minimal() +
-#   theme(axis.line = element_line(),
-#         panel.spacing = unit(2, "lines")) +
-#   coord_cartesian(ylim = c(-1.5, 2.5)) +
-#   labs(y = TeX("Estimated $\\hat{\\tau}_j$"),
-#        x = TeX("True $\\tau_j$"))
-# ggsave("results_sree/shrinkageplot_slice2.png")
-
-
-
+# horizontal slice
 YMIN2 <- 0.4
 YMAX2 <- 0.7
 spdf %>% 
