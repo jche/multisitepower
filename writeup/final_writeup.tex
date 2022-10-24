@@ -67,33 +67,32 @@
 
 \section{Introduction}
 
-Researchers typically power multisite trials to effectively estimate whether their intervention of interest improves outcomes on average, across all sites.
-They can use existing tools to design multisite trials that have high power for this overall average treatment effect [add citation].
+Researchers typically power multisite trials to estimate whether their intervention of interest improves outcomes on average, across all sites.
+They can use existing tools to design multisite trials that have high power for this overall average treatment effect [add citation, PUMP or something else?].
 If desired, researchers can also power multisite trials to detect given levels of cross-site impact variation [add citation].
 
 In many applications, however, it may also be important to powerfully estimate the treatment effects within individual sites.
 Site stakeholders are often much more interested in whether the treatment improved outcomes within their individual site than in whether the treatment appeared to be effective overall.
-[insert examples, add citations].
+Estimation of site-level treatment effects becomes particularly important when researchers suspect substantial unmodeled heterogeneity across sites, which occurs in many settings.
 
 This paper provides guidelines for researchers interested in designing multisite trials to effectively estimate individual site-level treatment effects.
-We suggest that to achieve this goal, researchers should focus on characterizing the \textbf{average length of the interval estimates} produced by their estimation method of choice, for their design of choice.
+We suggest that to achieve this goal, researchers should focus on characterizing the average margins of error from the interval estimates produced by their estimation method of choice, for their design of choice.
 We support our suggestion via a careful study of the site-level interval estimates produced by standard methods for analyzing multisite trials, clarifying common points of confusion regarding their interpretation.
-We then use a detailed simulation study to illustrate how design factors affect average interval length.
+We then use a detailed simulation study to illustrate how design factors affect average margin of error.
 
 The paper proceeds as follows.
-[TODO]
-% Section 2 provides background on estimating site-level treatment effects and motivates the questions we aim to address in this paper.
-% In Section 3 we introduce the simulation framework we use to address these questions and illustrate the main ideas in this paper.
-% We conduct a large-scale simulation study in Section 4.
-% Finally, in Section 5 we provide a useful template for a power analysis conducted under our proposed framework.
+Section 2 provides background on site-level treatment-effect estimation in multisite trials.
+In Section 3 we introduce our simulation framework and modeling methods.
+Section 4 steps through an illustrative example that motivates the suggestions we make in this paper, and Section 5 elaborates via an extensive simulation study.
+Finally, in Section 6 we provide a useful template for a power analysis conducted under our proposed framework, based on a real-world example.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Background}
 
 \subsection{Mathematical framework}
 
 In a multisite trial, the same randomized trial is conducted within each of several sites.
-For example, [insert running example].
 Rather than separately estimating the treatment effect for each site, it is well known that shrinking the noisy site-level treatment-effect estimates toward an overall average produces a better collection of estimates in terms of mean-squared error \citep{james1961estimation}.
 For $J$ total sites, this shrinkage can be motivated by the following mathematical framework:
 \begin{align*}
@@ -114,15 +113,13 @@ These methods can generally be categorized using two factors: whether they are p
 % The many methods for estimating site-level treatment effects under the framework above can generally be categorized using two factors: whether they are parametric or nonparametric, and whether they are empirical Bayes or fully Bayesian.
 
 Applied researchers typically use parametric methods to analyze multisite trials.
-Empirical Bayes random-effects and mixed-effects models are particularly popular due to their ease of implementation \citep{bloom2017using}, though Bayesian methods are used in many applications as well \citep{rubin1981estimation}.
+Empirical Bayes random-effects and mixed-effects models are particularly popular due to their ease of implementation \citep{bloom2017using}, though Bayesian methods have been used in many applications as well \citep{rubin1981estimation}.
 The literature on random-effects meta-analysis \citep{higgins2009re} and empirical Bayes confidence interval methods \citep{morris1983parametric, he1992parametric, gene2009empirical} also contains many parametric procedures for problems similar to the analysis of multisite trials.
 Standard parametric methods assume $G \sim N(\mu, \sigma^2)$ for unknown mean and variance parameters $\mu$ and $\sigma^2$, which must then be estimated.
-Empirical Bayes and Bayesian methods differ in how they estimate these parameters.
-Empirical Bayes methods typically use maximum likelihood and/or restricted maximum likelihood approaches to estimate $\mu$ and $\sigma$.
-Fully Bayesian methods set parametric priors on $\mu$ and $\sigma$ and either analytically derive or use Monte Carlo Markov chain (MCMC) sampling to estimate their posterior distributions.
+Empirical Bayes methods typically use maximum likelihood and/or restricted maximum likelihood approaches to estimate $\mu$ and $\sigma$, while fully Bayesian methods set parametric priors on $\mu$ and $\sigma$ and either analytically derive or use Monte Carlo Markov chain (MCMC) sampling to estimate their posterior distributions.
 
 In recent years, semi- and non-parametric methods for this problem have received significant attention in the theoretical literature.
-These methods avoid placing strong parametric assumptions on the distribution of $G$ while technically maintaining the statistical properties and computational feasibility of parametric methods.
+These methods avoid placing strong parametric assumptions on the distribution of $G$ while maintaining the statistical properties and computational feasibility of parametric methods.
 Semiparametric empirical Bayes procedures flexibly estimate $G$ from the data \citep{laird1987empirical, yu2018adaptive}, while nonparametric empirical Bayes methods assume a general class of distributions for $G$ \citep{ignatiadis2022confidence} or avoid distributional assumptions on $G$ entirely \citep{armstrong2020robust}.
 Nonparametric Bayesian methods place highly flexible priors on $G$, such as Dirichlet process priors (e.g., cite some DP stuff).
 
@@ -133,7 +130,7 @@ We aim to clarify the use of parametric models for this task and leave the evalu
 \subsection{Motivation}
 
 To conduct power analyses for the site-level treatment effects $\tau_j$ in multisite trials, we must first define coverage for the interval estimates of the $\tau_j$ values.
-In a single-site randomized trial, standard interval estimates will cover the site's true treatment effect $100(1-\alpha)$\% of the time for some given significance level $\alpha$, across (hypothetical) repeated trials.
+In a single-site randomized trial, standard interval estimates cover the site's true treatment effect $100(1-\alpha)$\% of the time for a given significance level $\alpha$, across (hypothetical) repeated trials.
 Because of shrinkage, the interval estimates produced by empirical Bayes and Bayesian procedures generally do not have this property for the site-level treatment effects $\tau_j$ in multisite trials.\footnote{Some interval estimates, such as those proposed by \citet{yu2018adaptive}, satisfy coverage for each $\tau_j$, but these types of interval estimates are not common in the literature.}
 Instead, these intervals typically possess a so-called empirical Bayes coverage property \citep{morris1983parametric}, which guarantees $100(1-\alpha)$\% coverage across the collection of $\tau_j$ values for all $J$ sites, rather than $100(1-\alpha)$\% coverage for each individual site.
 In particular, shrinkage induces the intervals generated by these procedures to overcover for values of $\tau_j$ close to the overall mean and undercover for values far from it \citep{snijders2011multilevel}.
@@ -141,15 +138,16 @@ In particular, shrinkage induces the intervals generated by these procedures to 
 While this behavior is well-understood in a statistical sense, it can lead to practical confusion for site stakeholders and research analysts alike.
 For example, what should a site stakeholder expect from the final interval estimate for their particular site?
 Is the notion of power induced by the definition of empirical Bayes coverage useful for the research analyst who wants to design multisite trials interested in estimating site-level treatment effects?
-In the sections that follow, we conduct a simulation study to clarify the statistical properties of empirical Bayes and Bayesian interval estimates for multisite trials, which in turn helps to answer these questions and provide a practical path forward.
+In the sections that follow, we use an illustrative example along with a simulation study to clarify the statistical properties of empirical Bayes and Bayesian interval estimates for multisite trials, which in turn helps to answer these questions and provide a practical path forward.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Methods}
 
 \subsection{Simulation setup}
 
 For our simulation studies, we simulate data from a multisite trial and estimate the site-level treatment effects $\tau_j$.
-We simulate multisite trial data using the \texttt{blkvar} package in R.
+We simulate multisite trial data using the \texttt{blkvar} package in R [CITE].
 Specifically, we sample observed outcomes $Y_{ij}$ for student $i$ in site $j$ as:
 \begin{align*}
 	Y_{ij} &= \alpha_j + \tau_j Z_{ij} + \epsilon_{ij} \\
@@ -172,15 +170,12 @@ We also set $\rho_{10}=0$ so the intercept and treatment random effects are unco
 
 For simplicity, we condense the data within each site to an average treatment effect $\hat{\tau}_j$ and an estimated standard error $\text{s.e}_j$ before applying shrinkage estimators.
 We let $\hat{\tau}_j$ be the simple difference-in-means estimate, $\hat{\tau}_j = \frac{1}{n_{1j}} \sum_i Z_{ij}Y_{ij} - \frac{1}{n_{0j}} \sum_i (1-Z_{ij})Y_{ij}$, where $n_{1j}$ and $n_{0j}$ represent the number of treated and control units within site $j$, respectively.
-The estimate of $\text{s.e}_j$ varies with the analytic method; meta-analytic approaches use standard errors separately estimated within each site, while other methods pool information across sites to estimate these standard errors.
+The estimate of $\text{s.e}_j$ varies with the analytic method; meta-analytic approaches are restricted to using standard errors separately estimated within each site, while other methods can pool information across sites to estimate these standard errors.
 Our condensed data ultimately takes the form:
 \begin{align*}
     \hat{\tau}_j &\sim N(\tau_j, \text{s.e}_j), \ \ j=1,\dots,J \\
     \tau_j &\sim N(\tau, \sigma_\tau^2).
 \end{align*}
-
-% In the formal simulation study, we vary four data-generating parameters: the average size of each site $\bar{n}$, the number of sites $J$, the true overall average treatment effect $\tau$, and the true cross-site variation in site-level effects $\sigma^2_\tau$.
-
 
 \subsection{Analytic methods}
 
@@ -199,6 +194,7 @@ While it is well-known that parametric normal models can produce suboptimal resu
 In any case, our simulation study focuses on studying the behavior of shrinkage estimators.
 Though misspecification affects the performance of these estimators, it does not strongly affect their general behavior, so we proceed with the simple well-specified model.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Illustrative example}
 
@@ -237,10 +233,9 @@ Figure \ref{fig:shrinkageplot_slice3} replicates Figure \ref{fig:shrinkageplot_s
 We notice that the large MLM estimates are more clustered toward the right-hand side of the plot than are the large single-site estimates.
 In other words, the large MLM estimates are more likely to correspond to truly large values of $\tau_j$.
 
-
 \subsection{Repeated simulation}
 
-To more precisely quantify these ideas of coverage for each $\tau_j$ value and coverage for each $\hat{\tau}_j$ value, we simulate 1000 multisite trial datasets and summarize the results in the figures below.
+To more precisely quantify these ideas of coverage conditional on $\tau_j$ or $\hat{\tau}_j$ value, we simulate 1000 multisite trial datasets and summarize the results in the figures below.
 In a traditional power analysis, the analyst posits an effect size $c$ and computes power for that effect size.
 An analogous procedure for the site-level treatment effects in a multisite trial is to compute power for each true site-level treatment effect size $\tau_j$.
 Figure \ref{fig:pcp1} visualizes the results of a power simulation under this setup.\footnote{For clarity, we round the true site-level treatment effects $\tau_j$ to the nearest 0.05 prior to simulating site-level data, and we only visualize the power curves for $\tau_j =$ 0, 0.2, and 0.4.}
@@ -298,47 +293,96 @@ Without shrinkage, though, naive t-test intervals are too noisy to be reliable i
 To avoid these challenges, we suggest that researchers focus on characterizing the average length of the interval estimates produced by their method of choice, across the posited distribution of $\tau_j$ values.
 Averaging any metric of choice across the distribution of $\tau_j$ achieves two goals.
 On a basic level, doing so mirrors the concept behind empirical Bayes coverage, which is what most shrinkage methods aim to achieve.
-More practically, averaging across $\tau_j$ values circumvents the difficulties that come with conditioning on particular values of $\tau_j$, and may even be more useful for site-focused power analyses.
+More practically, averaging across $\tau_j$ values results in simpler prospective power analyses.
 Prior to conducting a multisite trial, it is difficult to predict where a particular site's treatment effect $\tau_j$ may fall in the distribution $G$.
-Since sites are exchangeable, however, analyzing the average performance of an interval estimator gives some indication of how that estimator will perform for each particular site, even without knowing $\tau_j$.
+Since sites are exchangeable, however, analyzing the average performance of an interval estimator gives some indication of how that estimator will perform for each particular site, even without specifying each site's $\tau_j$ value.
 
-We suggest using interval length as the metric of choice to simplify interpretation.
+We suggest using margin of error as the metric of choice to simplify interpretation.
 We would ideally like to consider some form of average minimum detectable effect size (MDES), so that the multisite trial could be powered to consistently detect a particular effect size.
 Unfortunately, it makes no sense to average MDES values across the distribution of $\tau_j$ values, since the MDES values themselves are the minimum $\tau_j$ values that achieve 80\% power.
-Interval lengths, on the other hand, can be averaged across the distribution of $\tau_j$ values while still maintaining some of the primary motivations behind MDES.
+Error margins, on the other hand, can be averaged across the distribution of $\tau_j$ values while still maintaining some of the primary motivations behind MDES.
 Researchers can design a multisite trial to achieve some acceptable average margin of error for the site-level treatment effects.
 Then, as a rule of thumb, the study would generally be powerful enough to detect effects larger than this average margin of error.
+
 [NOTE: could do an interval length per $\tau_j$ value plot... essentially would show that $\tau_j=0.2$ has shorter intervals and extreme $\tau_j$ has wider intervals, not clear if this is helpful]
 
 [One other motivation that I like, but it's not precise:
 Average power begs the question: for which values of $\tau_j$ are the intervals more or less powerful?
-This is a sad question, since conditioning on $\tau_j$ makes MLMs bad.
+This is a sad question, since conditioning on $\tau_j$ makes MLMs look bad.
 Average interval length, on the other hand, begs the question: for which values of $\hat{\tau}_j$ are the intervals longer or shorter?
 This is a happier question.]
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Simulation study}
 
-TONIGHT: run some simulations...
-
 \subsection{Setup}
 
-\subsection{Conclusions}
+We conduct a simulation study to explore trends in how different data-generating factors affect average margin of error.
+In particular, we let the number of sites $J = 10, 25, 100$; the overall average treatment effect $\tau = 0.1, 0.2, 0.3$; the cross-site effect heterogeneity $\sigma^2_\tau = 0.1, 0.2, 0.3$; and the intraclass correlation coefficient $ICC \equiv \frac{\sigma^2_\alpha}{\sigma^2_\alpha + \sigma^2_y} = 0.1, 0.2, 0.3$.
+To keep the simulation simple, we use the illustrative example simulation as our base case ($J=25$, $\bar{n}=5,10,\dots,200$, $\tau=\sigma_\tau=ICC=0.2$) and study the main effects of varying these factors one at a time.
+For each set of data-generating parameters, we simulate 10,000 total sites.\footnote{We simulate 1000 datasets for $J=10$, 400 datasets for $J=25$, and 100 datasets for $J=100$.}
+
+\subsection{Results}
+
+Increasing the number of sites slightly improves average margin of error, particularly when sites are small.
+Figure \ref{fig:results_J} plots the average margin of error for different values of $J$.
+We see that, e.g., when $\bar{n}=25$, increasing the number of sites from 10 to 25 reduces the average margin of error by roughly 0.06 effect-size units, i.e., by about 15\%.
+This reduction is roughly equivalent to the reduction associated with increasing $\bar{n}$ to 40 for the 10 sites.
+In general, however, we note that the gains from adding more sites are overshadowed by the gains from adding more observations to each site;
+if given a choice between the two, researchers interested in understanding site-level treatment effects should prioritize increasing sample sizes within study sites rather than adding more sites to their study.
+% Power and coverage don't really change, so we omit those plots.
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=\textwidth]{simstudy_J_length}
+	\caption{Average margin of error ($J=10,25,100$, $\tau=0.2$, $\sigma_\tau=0.2$, $ICC=0.2$).}
+	\label{fig:results_J}
+\end{figure}
+
+Low cross-site treatment-effect heterogeneity leads to significantly smaller average margins of error.
+As shown in \ref{fig:results_txsd}, decreasing $\sigma_\tau$ values significantly improves average margins of error.
+This indicates that our proposed power analyses are generally sensitive to the specification of $\sigma_\tau$;
+incorrectly specifying low $\sigma_\tau$ values can lead to serious overoptimism about the average margin of error.
+Researchers should carefully consider a range of reasonable values for $\sigma_\tau$ when powering their multisite trials to avoid this potential pitfall.
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=\textwidth]{simstudy_txsd_length}
+	\caption{Average margin of error ($J=25$, $\tau=0.2$, $\sigma_\tau=0.1, 0.2, 0.3$, $ICC=0.2$).}
+	\label{fig:results_txsd}
+\end{figure}
+% Note: small $\sigma_\tau$ means large shrinkage, which means huge implications for interval interpretation
+
+Varying $\tau$ and $ICC$ has little effect on average interval length in our simulations, so we omit these results.
+The simulations sample $\tau_j \sim N(\tau, \sigma_\tau^2)$, so shifting $\tau$ naturally has no effect on average interval length.
+If there is good reason to suspect that the site-level treatment effects do not come from a location family of distributions, however, it may become necessary to specify reasonable values of $\tau$ for a power analysis.
+Increasing $ICC$ has very minimal effects on average interval length, since site-level intercepts do not affect estimated site-level treatment effects.\footnote{Our simulations are in effect-size units, i.e., $\sigma^2_\alpha + \sigma^2_y = 1$, so increasing $ICC$ decreases $\sigma^2_y$.
+As a result, increasing $ICC$ in our simulations leads to very slightly smaller average margins of error.}
+
+Overall, simulation factors..
+
+Sample size in site is the most important.
+
+% TODO: highlight importance of correct interpretation?
 
 
 \section{Case study}
 
 To illustrate our suggested approach for powering multisite trials to detect site-level treatment effects, we conduct an example power analysis.
 
-[TODO: model this based on some application of interest, wait for ]
+[TODO: model this based on some application of interest, wait for Mike's example]
 
 
 \section{Conclusion}
 
-Synthesize simulation results here.
+In many settings, analysts may wish to power multisite trials to consistently detect effects at individual sites.
+While this task appears straightforward at first glance, it is important to carefully consider it interacts with the shrinkage models we use to estimate site-level treatment effects.
+In this paper, we suggest that simulating the average interval length is the clearest, simplest method to power multisite trials for site-level treatment effects.
 
-In many multisite trials, analysts may wish to power the trial to allow consistent detection of particular effect sizes at individual sites.
-While this task appears straightforward prima facie, we need to be careful about...
+OTHER SIMULATION STUDY CONCLUSIONS:
+Use larger sites, not more sites.
+
+TO MOTIVATE OUR SUGGESTION:
+We provide an illustrative example to clarify how shrinkage interacts with coverage.
 
 
 \bibliography{refs.bib}
