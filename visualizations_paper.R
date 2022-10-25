@@ -7,7 +7,7 @@ require(rstan)
 
 pal <- wes_palette("Zissou1", 5, type="continuous")
 
-
+MIN_SIZE <- 50
 
 # analyzing simulation results --------------------------------------------
 
@@ -144,7 +144,8 @@ tidy_results %>%
 ggsave("writeup/images/pp2.png")
 
 
-# coverage vs sample size -------------------------------------------------
+
+### coverage vs. sample size
 
 # conditioned on tau_j
 tidy_results %>% 
@@ -359,6 +360,230 @@ spdf %>%
   labs(y = TeX("Estimated $\\hat{\\tau}_j$"),
        x = TeX("True $\\tau_j$"))
 ggsave("writeup/images/shrinkageplot_slice3.png")
+
+
+
+
+
+# full simulation study ---------------------------------------------------
+
+### wrapper functions
+# IDEA: For J, tau, tx_sd, ICC as [x]...
+#  - plot [outcome] vs. nbar, colored by [x] levels
+#  - facet by conditioning variable
+# Only keep plots with differences
+if (T) {
+  # function to plot faceted power curves (almost lol)
+  power_plot <- function(d, color_var, cond_var, 
+                         color_caption, 
+                         cond_var_values=c(0, 0.2, 0.4)) {
+    d %>% 
+      filter({{cond_var}} %in% cond_var_values) %>%
+      mutate(across(c({{color_var}}, {{cond_var}}),
+                    ~as.factor(.))) %>%
+      group_by(nbar, J, ICC, tau, tx_sd, {{cond_var}}, method) %>% 
+      summarize(n = n(),
+                power = mean(reject_two)) %>% 
+      filter(n >= MIN_SIZE) %>% 
+      
+      ggplot(aes(x=nbar, y=power, color = {{color_var}})) +
+      geom_point(aes(size=n), alpha=0.1) +
+      geom_smooth(aes(group={{color_var}}), se=F) +
+      geom_hline(aes(yintercept=0.1), lty="dashed") +
+      geom_hline(aes(yintercept=0.8), lty="dashed") +    
+      scale_color_manual(values=pal[c(1,3,5)],
+                         guide = guide_legend(reverse=T)) +
+      theme_minimal() +
+      theme(axis.line = element_line(),
+            panel.spacing = unit(2, "lines")) +
+      scale_x_continuous(limits=c(0, 200)) + 
+      scale_y_continuous(limits=c(0, 1)) +
+      labs(y = "Power",
+           x = "Average site size",
+           color = color_caption) +
+      guides(size="none")
+  }
+  
+  # function to plot faceted coverage curves (almost lol)
+  coverage_plot <- function(d, color_var, cond_var, 
+                            color_caption, 
+                            cond_var_values=c(0, 0.2, 0.4)) {
+    d %>% 
+      filter({{cond_var}} %in% cond_var_values) %>%
+      mutate(across(c({{color_var}}, {{cond_var}}),
+                    ~as.factor(.))) %>%
+      group_by(nbar, J, ICC, tau, tx_sd, {{cond_var}}, method) %>% 
+      summarize(n = n(),
+                coverage = mean(covered_two)) %>% 
+      filter(n >= MIN_SIZE) %>% 
+      
+      ggplot(aes(x=nbar, y=coverage, color = {{color_var}})) +
+      geom_point(aes(size=n), alpha=0.1) +
+      geom_smooth(aes(group={{color_var}}), se=F) +
+      geom_hline(aes(yintercept=0.9), lty="dashed", color="black") +
+      
+      scale_color_manual(values=pal[c(1,3,5)],
+                         guide = guide_legend(reverse=T)) +
+      theme_minimal() +
+      theme(axis.line = element_line(),
+            panel.spacing = unit(2, "lines")) +
+      scale_x_continuous(limits=c(0, 200)) + 
+      scale_y_continuous(limits=c(0.5, 1)) +
+      labs(y = "Coverage",
+           x = "Average site size",
+           color = color_caption) +
+      guides(size="none")
+  }
+  
+  length_plot <- function(d, color_var, color_caption) {
+    d %>% 
+      filter(method == "MLM") %>%
+      mutate(across({{color_var}}, ~as.factor(.))) %>% 
+      group_by(nbar, J, ICC, tau, tx_sd, method) %>% 
+      summarize(interval_length = mean(q95 - q5)/2) %>% 
+      ggplot(aes(x=nbar, y=interval_length, color={{color_var}})) +
+      geom_point(alpha=0.5) +
+      geom_line(aes(group={{color_var}}),
+                size=1) +
+      # facet_wrap(~method) +
+      scale_color_manual(values = c(pal[c(1,3,5)])) +
+      coord_cartesian(ylim = c(0,1)) +
+      theme_minimal() +
+      theme(axis.line = element_line()) +
+      labs(y = "Average margin of error",
+           x = "Average site size",
+           color = color_caption)
+  }
+}
+
+### varying J
+full_study_J <- read_csv("final_sims/full_study_J.csv") %>%
+  mutate(reject_one = q10 >= 0,
+         covered_one = q10 <= ATE,
+         reject_two = q5 >= 0 | q95 <= 0,
+         covered_two = (q5 <= ATE) & (ATE <= q95)) %>%
+  mutate(ATEhat_bin = plyr::round_any(ATEhat, 0.05),
+         method = case_when(
+           method == "bayesnorm" ~ "MLM",
+           method == "single" ~ "Single"))
+caption <- TeX("$J$ value")
+
+# power conditioned on tau_j
+power_plot(full_study_J, J, ATE, caption, c(0, 0.2, 0.4)) +
+  facet_grid(ATE ~ method, scales="free")
+# power conditioned on tau_hat_j
+power_plot(full_study_J, J, ATEhat_bin, caption, c(0, 0.2, 0.4)) +
+  facet_grid(ATEhat_bin ~ method, scales="free")
+
+# coverage conditioned on tau_j
+coverage_plot(full_study_J, J, ATE, caption, c(0, 0.2, 0.4)) +
+  facet_grid(ATE ~ method, scales="free")
+# coverage conditioned on tau_hat_j
+coverage_plot(full_study_J, J, ATEhat_bin, caption, c(-0.4, -0.1, 0.2, 0.5, 0.8)) +
+  facet_grid(ATEhat_bin ~ method, scales="free")
+
+# average interval length: slightly decreases with J
+length_plot(full_study_J, J, caption)
+ggsave("writeup/images/simstudy_J_length.png")
+
+
+
+### varying tau
+full_study_tau <- read_csv("final_sims/full_study_tau.csv") %>%
+  mutate(reject_one = q10 >= 0,
+         covered_one = q10 <= ATE,
+         reject_two = q5 >= 0 | q95 <= 0,
+         covered_two = (q5 <= ATE) & (ATE <= q95)) %>%
+  mutate(ATEhat_bin = plyr::round_any(ATEhat, 0.05),
+         method = case_when(
+           method == "bayesnorm" ~ "MLM",
+           method == "single" ~ "Single"))
+caption <- TeX("$\\tau$ value")
+
+# power conditioned on tau_j: obviously differs with tau
+power_plot(full_study_tau, tau, ATE, caption, c(0, 0.2, 0.4)) +
+  facet_grid(ATE ~ method, scales="free")
+# power conditioned on tau_hat_j
+power_plot(full_study_tau, tau, ATEhat_bin, caption, c(0, 0.2, 0.4)) +
+  facet_grid(ATEhat_bin ~ method, scales="free")
+
+# coverage conditioned on tau_j
+coverage_plot(full_study_tau, tau, ATE, caption, c(0, 0.2, 0.4)) +
+  facet_grid(ATE ~ method, scales="free")
+# coverage conditioned on tau_hat_j
+coverage_plot(full_study_tau,tau, ATEhat_bin, caption, c(-0.4, -0.1, 0.2, 0.5, 0.8)) +
+  facet_grid(ATEhat_bin ~ method, scales="free")
+
+# average interval length
+length_plot(full_study_tau, tau, caption)
+
+
+
+### varying tx_sd
+
+full_study_txsd <- read_csv("final_sims/full_study_txsd.csv") %>%
+  mutate(reject_one = q10 >= 0,
+         covered_one = q10 <= ATE,
+         reject_two = q5 >= 0 | q95 <= 0,
+         covered_two = (q5 <= ATE) & (ATE <= q95)) %>%
+  mutate(ATEhat_bin = plyr::round_any(ATEhat, 0.05),
+         method = case_when(
+           method == "bayesnorm" ~ "MLM",
+           method == "single" ~ "Single"))
+caption <- TeX("$\\sigma_\\tau$")
+
+# power conditioned on tau_j
+power_plot(full_study_txsd, tx_sd, ATE, caption, c(0, 0.2, 0.4)) +
+  facet_grid(ATE ~ method, scales="free")
+# power conditioned on tau_hat_j
+power_plot(full_study_txsd, tx_sd, ATEhat_bin, caption, c(0, 0.2, 0.4)) +
+  facet_grid(ATEhat_bin ~ method, scales="free")
+
+# coverage conditioned on tau_j
+coverage_plot(full_study_txsd, tx_sd, ATE, caption, c(0, 0.2, 0.4)) +
+  facet_grid(ATE ~ method, scales="free")
+# coverage conditioned on tau_hat_j
+coverage_plot(full_study_txsd, tx_sd, ATEhat_bin, caption, c(-0.4, -0.1, 0.2, 0.5, 0.8)) +
+  facet_grid(ATEhat_bin ~ method, scales="free")
+
+# average interval length
+length_plot(full_study_txsd, tx_sd, caption)
+ggsave("writeup/images/simstudy_txsd_length.png")
+
+
+
+### varying ICC
+
+full_study_icc <- read_csv("final_sims/full_study_ICC.csv") %>%
+  mutate(reject_one = q10 >= 0,
+         covered_one = q10 <= ATE,
+         reject_two = q5 >= 0 | q95 <= 0,
+         covered_two = (q5 <= ATE) & (ATE <= q95)) %>%
+  mutate(ATEhat_bin = plyr::round_any(ATEhat, 0.05),
+         method = case_when(
+           method == "bayesnorm" ~ "MLM",
+           method == "single" ~ "Single"))
+caption <- TeX("$ICC$ value")
+
+# power conditioned on tau_j
+power_plot(full_study_icc, ICC, ATE, caption, c(0, 0.2, 0.4)) +
+  facet_grid(ATE ~ method, scales="free")
+# power conditioned on tau_hat_j
+power_plot(full_study_icc, ICC, ATEhat_bin, caption, c(0, 0.2, 0.4)) +
+  facet_grid(ATEhat_bin ~ method, scales="free")
+
+# coverage conditioned on tau_j
+coverage_plot(full_study_icc, ICC, ATE, caption, c(0, 0.2, 0.4)) +
+  facet_grid(ATE ~ method, scales="free")
+# coverage conditioned on tau_hat_j
+coverage_plot(full_study_icc, ICC, ATEhat_bin, caption, c(-0.4, -0.1, 0.2, 0.5, 0.8)) +
+  facet_grid(ATEhat_bin ~ method, scales="free")
+
+# average interval length
+length_plot(full_study_icc, ICC, caption)
+
+
+
 
 
 

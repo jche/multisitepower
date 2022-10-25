@@ -6,7 +6,7 @@ require(glue)
 
 dir <- "final_sims"
 # dir <- "results2"   # results2 is ONLY J=20 cases
-fhead <- "example2"   # example is sd=0.3, example2 is sd=0.2
+fhead <- "full_study"
 
 all_files <- list.files(dir)
 
@@ -23,9 +23,15 @@ res <- bind_rows(all_dfs)
 rm(all_files)
 rm(all_dfs)
 
-
 if (T) {
-  hits <- res
+  # for full_study: subset into smaller studies
+  #  - have already: J=25, ICC=tau=0.2, tx_sd=0.2, 0.3
+  
+  hits <- res %>% 
+    filter(J==25, 
+           ICC==0.2,
+           tau==0.2)
+           # tx_sd==0.2)
   
   # Get ATEs per method (long data)
   ATEhats <- hits %>%
@@ -61,6 +67,16 @@ if (T) {
            q5 = q5s,
            q10 = q10s,
            q95 = q95s)
+  
+  if (F) {
+    temp1 <- read_csv("final_sims/example_full.csv")
+    temp2 <- read_csv("final_sims/example2_full.csv")
+    
+    tidy_results %>% 
+      bind_rows(temp1 %>% filter(runID <= 400)) %>%
+      bind_rows(temp2 %>% filter(runID <= 400)) %>% 
+      write_csv(glue("{dir}/{fhead}_txsd.csv"))
+  }
   
   write_csv(tidy_results, glue("{dir}/{fhead}_full.csv"))
 }
