@@ -31,12 +31,12 @@ sim_case_study <- function(site_sizes,
     mutate(sid = 1:length(site_sizes), 
            .before=tau_j)
   
-  # confirm that all probabilities are within (0,1)
-  site_pars %>% 
-    mutate(valid = tau_j+alpha_j >= 0 & tau_j+alpha_j <= 1) %>% 
-    summarize(valid = min(valid)) %>% 
-    pull(valid) %>% 
-    if(!.) {stop("Bad simulation (p not in (0,1)): try again")}
+  # # confirm that all probabilities are within (0,1)
+  # site_pars %>% 
+  #   mutate(valid = tau_j+alpha_j >= 0 & tau_j+alpha_j <= 1) %>% 
+  #   summarize(valid = min(valid)) %>% 
+  #   pull(valid) %>% 
+  #   if(!.) {stop("Bad simulation (p not in (0,1)): try again")}
   
   # simulate individual-level data
   sim <- tibble(
@@ -44,6 +44,9 @@ sim_case_study <- function(site_sizes,
   ) %>% 
     left_join(site_pars, by="sid") %>% 
     mutate(z = purrr::rbernoulli(n(), p = 0.5),
+           p = alpha_j + tau_j*z,
+           p = ifelse(p <= 0, 0, p),
+           p = ifelse(p >= 1, 1, p),
            y = purrr::rbernoulli(n(), p = alpha_j + tau_j*z))
   
   # make site-level summaries
@@ -133,27 +136,80 @@ run_mlm <- function(sdat) {
            method = "MLM")
 }
 
-if (F) {
+run_case_study <- function(site_sizes,
+                           tau, sig_tau,
+                           alpha, sig_alpha,
+                           rho) {
   sdat <- sim_case_study(
     site_sizes,
     tau, sig_tau,
     alpha, sig_alpha,
     rho)
   
+  run_t_test(sdat) %>% 
+    bind_rows(run_mlm(sdat))
+}
+
+if (F) {
+  sdat <- sim_case_study(
+    site_sizes,
+    tau, sig_tau,
+    alpha, sig_alpha,
+    rho)
   run_t_test(sdat)
   run_mlm(sdat)
+  
+  run_case_study(site_sizes,
+                 tau, sig_tau,
+                 alpha, sig_alpha,
+                 rho)
+}
+
+
+
+# run simulation ----------------------------------------------------------
+
+# set site sample sizes
+site_sizes <- c(551, 412, 343, 173, 464, 544, 499, 396, 197, 116)
+
+# expand parameter grid
+df_sim <- expand_grid(
+  tau    = c(0.03),
+  sig_tau  = c(0.01, 0.02, 0.03, 0.04, 0.05),
+  alpha = c(0.175),
+  sig_alpha = c(0.01),
+  rho = c(0, 0.3, 0.6)
+)
+
+for (i in 1:1000) {
+  res <- df_sim %>% 
+    rowwise() %>% 
+    mutate(res = list(run_case_study(site_sizes,
+                                     tau, sig_tau,
+                                     alpha, sig_alpha,
+                                     rho))) %>% 
+    unnest(res)
+  
+  # store results
+  FNAME <- "case_study/case_study_results.csv"
+  if (file.exists(FNAME)) {
+    res %>%
+      mutate(runID = counter, .before=tau) %>%
+      write_csv(FNAME, append=T)
+    
+    counter <- counter+1
+  } else {
+    counter <- 1
+    res %>% 
+      mutate(runID = counter, .before=tau) %>% 
+      write_csv(FNAME)
+  }
 }
 
 
 
 
-
-
-
-
-
-
-
+# right way ---------------------------------------------------------------
 
 # attempting to simulate data the right way
 #  - sorta following https://www.barelysignificant.com/post/icc/
