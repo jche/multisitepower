@@ -319,7 +319,7 @@ This is a happier question.]
 \subsection{Setup}
 
 We conduct a simulation study to explore trends in how different data-generating factors affect average margin of error.
-In particular, we let the number of sites $J = 10, 25, 100$; the overall average treatment effect $\tau = 0.1, 0.2, 0.3$; the cross-site effect heterogeneity $\sigma^2_\tau = 0.1, 0.2, 0.3$; and the intraclass correlation coefficient $ICC \equiv \frac{\sigma^2_\alpha}{\sigma^2_\alpha + \sigma^2_y} = 0.1, 0.2, 0.3$.
+In particular, we let the number of sites $J = 10, 25, 100$; the overall average treatment effect $\tau = 0.1, 0.2, 0.3$; the cross-site effect heterogeneity $\sigma^2_\tau = 0.1, 0.2, 0.3$; and the intraclass correlation coefficient $ICC \equiv \frac{\sigma^2_\alpha}{\sigma^2_\alpha + \sigma^2_y} = 0.1, 0.2, 0.3$ to mirror standard data settings in education trials \citep{weiss2017much}.
 To keep the simulation simple, we use the illustrative example simulation as our base case ($J=25$, $\bar{n}=5,10,\dots,200$, $\tau=\sigma_\tau=ICC=0.2$) and study the main effects of varying these factors one at a time.
 For each set of data-generating parameters, we simulate 10,000 total sites.\footnote{We simulate 1000 datasets for $J=10$, 400 datasets for $J=25$, and 100 datasets for $J=100$.}
 
@@ -335,7 +335,7 @@ if given a choice between the two, researchers interested in understanding site-
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{simstudy_J_length}
-	\caption{Average margin of error ($J=10,25,100$, $\tau=0.2$, $\sigma_\tau=0.2$, $ICC=0.2$).}
+	\caption{Average margin of error across different values of $J$ ($\tau=0.2$, $\sigma_\tau=0.2$, $ICC=0.2$).}
 	\label{fig:results_J}
 \end{figure}
 
@@ -347,7 +347,7 @@ Researchers should carefully consider a range of reasonable values for $\sigma_\
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{simstudy_txsd_length}
-	\caption{Average margin of error ($J=25$, $\tau=0.2$, $\sigma_\tau=0.1, 0.2, 0.3$, $ICC=0.2$).}
+	\caption{Average margin of error across different values of $\sigma_\tau$ ($J=25$, $\tau=0.2$, $ICC=0.2$).}
 	\label{fig:results_txsd}
 \end{figure}
 % Note: small $\sigma_\tau$ means large shrinkage, which means huge implications for interval interpretation
@@ -358,18 +358,61 @@ If there is good reason to suspect that the site-level treatment effects do not 
 Increasing $ICC$ has very minimal effects on average interval length, since site-level intercepts do not affect estimated site-level treatment effects.\footnote{Our simulations are in effect-size units, i.e., $\sigma^2_\alpha + \sigma^2_y = 1$, so increasing $ICC$ decreases $\sigma^2_y$.
 As a result, increasing $ICC$ in our simulations leads to very slightly smaller average margins of error.}
 
-Overall, simulation factors..
+Overall, the simulations show that site-level sample size is the primary driver of average margin of error.
+This result is intuitive; if site-level treatment effects are of interest, large site-level samples are required to precisely estimate them.
+For the data settings we considered, approximately 50-100 observations were required on average per site in order to achieve a margin of error of around 0.25 at 90\% confidence.
+If these sample sizes are unavailable, researchers may still be able to achieve reasonable average margins of error if there happens to be little cross-site treatment-effect heterogeneity.
+Increasing the number of sites also improves average margins of error, but by far less than does increasing average site-level sample sizes.
 
-Sample size in site is the most important.
-
-% TODO: highlight importance of correct interpretation?
-
+% TODO: highlight importance of correct interpretation when there's a bunch of shrinkage?
+% TODO: highlight absolute stuff. Like how hard it is to estimate precisely, even in our ``best'' data settings.
 
 \section{Case study}
 
-To illustrate our suggested approach for powering multisite trials to detect site-level treatment effects, we conduct an example power analysis.
+\subsection{Background: Scaling Up College Completion Efforts for Student Success (SUCCESS)}
 
-[TODO: model this based on some application of interest, wait for Mike's example]
+% https://www.mdrc.org/project/scaling-college-completion-efforts-student-success-success#overview
+To illustrate our suggested approach for powering multisite trials to detect site-level treatment effects, we conduct an example power analysis.
+We base our case study on the Scaling Up College Completion Efforts for Student Success (SUCCESS) initiative designed by the Manpower Demonstration Research Corporation (MDRC).
+SUCCESS aims to improve 3-year degree completion rates for traditionally underserved college students by implementing programs proven to work in these settings, such as ``frequent proactive advising; financial incentives tied to service usage; strategies focused on increasing academic momentum; and the use of real-time data to support student progress'' \citep{MDRCsuccess}.
+Our prospective study will be conducted in ten community colleges across five states, with projected sample sizes known in advance.
+Each school is interested in a principled estimate of the treatment effect at their site.
+Scaling the program would likely involve state funding, so we are also interested in understanding treatment effects within each state.
+
+\subsection{Data-generating model}
+
+To conduct the power analysis, we simulate data under the following simplified model:
+\begin{align*}
+    Y_{ij} &\sim Bernoulli(p_{ij}) \\
+    p_{ij} &= \alpha_j + Z_{ij} \tau_j \\
+    \alpha_j &= \alpha + u_{0j} \\
+	\tau_j &= \tau + u_{1j} \\
+	\begin{pmatrix}
+		u_{0j} \\ u_{1j}
+	\end{pmatrix} &\sim N\left(
+	\begin{pmatrix}
+		0 \\ 0
+	\end{pmatrix}, 
+	\begin{bmatrix}
+		\sigma^2_\alpha & \rho_{01} \\  & \sigma^2_\tau
+	\end{bmatrix}\right).
+\end{align*}
+We truncate $p_{ij}$ to keep it within the interval (0,1).\footnote{We use this simple model rather than a logistic regression model for $p_{ij}$ for clarity, since it allows for direct translation of postulated effect sizes into the model.}
+Past experimental evidence suggests that $\tau_j$ values are typically moderate, about 0-5 percentage points, though they can be as large as 18 percentage points.
+With the onset of COVID-19, however, early treatment-effect estimates suggest more moderate effects, in the 2-4 percentage point range.
+Base graduation rates are low, in the 15-20\% range.
+We therefore simulate data using $\alpha = 0.175$, $\sigma_\alpha=0.01$, and $\tau=0.03$, and use a variety of possible values for $\sigma_\tau$ and $\rho_{01}$.
+Because each site/state's projected sample size is already fixed and known in advance, we fix these values and aim to infer how precisely we can expect to estimate their treatment effects under the posited distribution of treatment effects.
+
+\subsection{Results}
+
+Figure 
+
+Figure asdf shows the results.
+
+Just show the figure with different sigma_tau values...?
+
+We can expect poor precision...
 
 
 \section{Conclusion}
