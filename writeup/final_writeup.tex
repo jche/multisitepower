@@ -210,7 +210,7 @@ For 100 simulated $\tau_j$ values, Figure \ref{fig:shrinkageplot} shows the 90\%
 \end{figure}
 In this simulation, 90 of the MLM intervals and 91 of the single-site intervals contain their respective true $\tau_j$ values.
 
-The two methods, however, achieve this $\approx$ 90\% coverage in different ways.
+The two methods, however, achieve this approximate 90\% coverage in different ways.
 As seen in Figure \ref{fig:shrinkageplot}, the MLM shrinks its point estimates toward the overall average.
 This shrinkage improves coverage for moderate $\tau_j$ values, but causes the MLM to overestimate the lowest $\tau_j$ values and underestimate the highest $\tau_j$ values.
 For example, Figure \ref{fig:shrinkageplot_slice1} highlights the intervals for sites with true $\tau_j \approx 0.6$.
@@ -233,7 +233,10 @@ Figure \ref{fig:shrinkageplot_slice3} replicates Figure \ref{fig:shrinkageplot_s
 We notice that the large MLM estimates are more clustered toward the right-hand side of the plot than are the large single-site estimates.
 In other words, the large MLM estimates are more likely to correspond to truly large values of $\tau_j$.
 
-\subsection{Repeated simulation}
+This example reviews how to properly interpret the interval estimates produced by MLMs.
+While specific coverage properties depend on model specification \citep{armstrong2020robust}, MLM intervals will generally contain their respective true parameters at close to the correct rate.
+Given observed data, each interval estimate has a high probability of containing its respective $\tau_j$ value.
+MLM shrinkage means, however, that extreme $\tau_j$ values will categorically be difficult to correctly estimate.
 
 To more precisely quantify these ideas of coverage conditional on $\tau_j$ or $\hat{\tau}_j$ value, we simulate 1000 multisite trial datasets and summarize the results in the figures below.
 In a traditional power analysis, the analyst posits an effect size $c$ and computes power for that effect size.
@@ -417,7 +420,7 @@ We again use $\alpha = 0.175$ and $\sigma_\alpha=0.01$, but we fix the mean of t
 Figure \ref{fig:gammas} shows the resulting distributions of site-level treatment effects.
 \begin{figure}
     \centering
-    \includegraphics[width = \textwidth]{}
+    \includegraphics[width = \textwidth]{writeup/images/gamma.png}
     \caption{Gamma distributions considered for site-level treatment effects.}
     \label{fig:gammas}
 \end{figure}
@@ -437,18 +440,23 @@ The average margin of error is not sensitive to $\rho_{01}$, so we exclude those
 For example, as $\sigma_\tau$ increases from 1 percentage point to 5 percentage points, the average margin of error for the smallest site increases by nearly 50\%.
 
 The state-level analysis produces similar results.
-
-
-
-
+Figure \ref{fig:case_study_states_moe}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{writeup/images/case_study_states_moe.png}
+    \caption{Average margin of error in case study. Points correspond to prospective sample sizes within 5 states. Dashed black line represents single-site-estimate margins of error.}
+    \label{fig:case_study_states_moe}
+\end{figure}
 
 Overall, the case study suggests that while it may be challenging to precisely estimate effects within each college, it may be more reasonable to do so for states.
 
 \section{Conclusion}
 
 In many settings, analysts may wish to power multisite trials to consistently detect effects at individual sites.
-While this task appears straightforward at first glance, it is important to carefully consider it interacts with the shrinkage models we use to estimate site-level treatment effects.
+While this task appears straightforward at first glance, it is important to carefully consider how it interacts with the shrinkage models we use to estimate site-level treatment effects.
 In this paper, we suggest that simulating the average interval length is the clearest, simplest method to power multisite trials for site-level treatment effects.
+
+
 
 OTHER SIMULATION STUDY CONCLUSIONS:
 Use larger sites, not more sites.
