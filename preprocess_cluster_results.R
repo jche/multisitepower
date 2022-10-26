@@ -5,12 +5,12 @@ require(tidyverse)
 require(glue)
 
 dir <- "case_study"
-fhead <- "stateres_"
+fhead <- "res2_"
 
 all_files <- list.files(dir)
 
 max_runID <- 0
-all_dfs <- all_files[str_detect(all_files, glue("{fhead}"))] %>%
+all_dfs <- all_files[str_starts(all_files, glue("{fhead}"))] %>%
   map(function(fname) {
     df <- read_csv(glue("{dir}/{fname}")) %>%
       mutate(runID = runID + max_runID)
@@ -22,13 +22,13 @@ res <- bind_rows(all_dfs)
 rm(all_files)
 rm(all_dfs)
 
-if (F) {
+if (T) {
   foo <- res %>% 
-    mutate(runID = rep(1:1000, each=150))
-  write_csv(foo, "case_study/case_study_states_results.csv")
+    mutate(runID = rep(1:1000, each=60))
+  write_csv(foo, "case_study/case_study2_results.csv")
 }
 
-if (T) {
+if (F) {
   # for full_study: subset into smaller studies
   #  - have already: J=25, ICC=tau=0.2, tx_sd=0.2, 0.3
   

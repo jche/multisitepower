@@ -1,12 +1,5 @@
 
-# power study
-
-# idea: we have actual sample sizes, and number of sites.
-#  - we want to know: how precise can we get for individual site-level tx effects?
-
-# note: model is wrong, since p_ij is not bounded in (0,1)
-#  - but it's much easier to follow along with, so let's stick with it
-
+# same as case_study, but with a gamma tx effect distribution
 
 require(tidyverse)
 require(mvtnorm)
@@ -17,21 +10,16 @@ ON_CLUSTER <- T
 
 # simulate data -----------------------------------------------------------
 
-sim_case_study <- function(site_sizes,
-                           tau, sig_tau,
-                           alpha, sig_alpha,
-                           rho) {
-  # simulate site-level parameters
-  site_pars <- rmvnorm(n = length(site_sizes),
-                       mean = c(tau, alpha),
-                       sigma = matrix(c(sig_tau^2, rho*sig_tau*sig_alpha, 
-                                        rho*sig_tau*sig_alpha, sig_alpha^2),
-                                      ncol = 2)) %>% 
-    as_tibble(.name_repair = "unique") %>%
-    rename(tau_j = ...1,
-           alpha_j = ...2) %>% 
-    mutate(sid = 1:length(site_sizes), 
-           .before=tau_j)
+# simulate treatment effects from a gamma distribution
+sim_case_study2 <- function(site_sizes,
+                            tau, b,
+                            alpha, sig_alpha) {
+  
+  site_pars <- tibble(
+    sid = 1:length(site_sizes),
+    tau_j = rgamma(length(site_sizes), shape=tau*b, rate=b),
+    alpha_j = rnorm(length(site_sizes), mean=alpha, sd=sig_alpha),
+  )
   
   # simulate individual-level data
   sim <- tibble(
@@ -65,16 +53,14 @@ if (F) {
   
   
   # set data-generating parameters (note: no ICC)
-  tau <- 0.02
-  sig_tau <- 0.01
+  tau <- 0.03
+  b <- 50
   alpha <- 0.175
   sig_alpha <- 0.01
-  rho <- 0
   
-  sim_case_study(site_sizes,
-                 tau, sig_tau,
-                 alpha, sig_alpha,
-                 rho)
+  sim_case_study2(site_sizes,
+                 tau, b,
+                 alpha, sig_alpha)
 }
 
 
@@ -99,9 +85,9 @@ run_mlm <- function(sdat) {
   if (!exists("mod_norm")) {
     # global assignment to avoid garbage collection and subsequent recompiling
     mod_norm <<- stan_model(# "Stan/dp_normal_reparam.stan",
-                            "Stan/case_study_model.stan",
-                            model_name = "norm",
-                            auto_write = T)
+      "Stan/case_study_model.stan",
+      model_name = "norm",
+      auto_write = T)
   }
   
   # fit model
@@ -148,15 +134,13 @@ run_mlm <- function(sdat) {
            method = "MLM")
 }
 
-run_case_study <- function(site_sizes,
-                           tau, sig_tau,
-                           alpha, sig_alpha,
-                           rho) {
-  sdat <- sim_case_study(
+run_case_study2 <- function(site_sizes,
+                            tau, b,
+                            alpha, sig_alpha) {
+  sdat <- sim_case_study2(
     site_sizes,
-    tau, sig_tau,
-    alpha, sig_alpha,
-    rho)
+    tau, b,
+    alpha, sig_alpha)
   
   run_t_test(sdat) %>% 
     bind_rows(run_mlm(sdat))
@@ -170,16 +154,14 @@ if (F) {
   
   # set data-generating parameters (note: no ICC)
   tau <- 0.02
-  sig_tau <- 0.01
+  b <- 50
   alpha <- 0.175
   sig_alpha <- 0.01
-  rho <- 0  
   
-  sdat <- sim_case_study(
+  sdat <- sim_case_study2(
     site_sizes,
-    tau, sig_tau,
-    alpha, sig_alpha,
-    rho)
+    tau, b,
+    alpha, sig_alpha)
   run_t_test(sdat)
   
   set.seed(90210)
@@ -196,16 +178,15 @@ if (F) {
 # run simulation ----------------------------------------------------------
 
 # set site sample sizes
-# site_sizes <- c(551, 412, 343, 173, 464, 544, 499, 396, 197, 116)
-site_sizes <- c(551, 928, 895, 1008, 309)
+site_sizes <- c(551, 412, 343, 173, 464, 544, 499, 396, 197, 116)
+# site_sizes <- c(551, 928, 895, 1008, 309)
 
 # expand parameter grid
 df_sim <- expand_grid(
-  tau    = c(0.03),
-  sig_tau  = c(0.01, 0.02, 0.03, 0.04, 0.05),
+  tau   = c(0.03),
+  b     = c(50, 150, 250),
   alpha = c(0.175),
-  sig_alpha = c(0.01),
-  rho = c(0, 0.3, 0.6)
+  sig_alpha = c(0.01)
 )
 
 if(ON_CLUSTER) {
@@ -213,13 +194,13 @@ if(ON_CLUSTER) {
   require(glue)
   
   for (i in 1:10) {
-    FNAME <- glue("case_study_results/stateres_{str_sub(UUIDgenerate(), 1, 7)}.csv")
+    FNAME <- glue("case_study_results/res2_{str_sub(UUIDgenerate(), 1, 7)}.csv")
+    # FNAME <- glue("case_study_results/stateres2_{str_sub(UUIDgenerate(), 1, 7)}.csv")
     res <- df_sim %>% 
       rowwise() %>% 
-      mutate(res = list(run_case_study(site_sizes,
-                                       tau, sig_tau,
-                                       alpha, sig_alpha,
-                                       rho))) %>% 
+      mutate(res = list(run_case_study2(site_sizes,
+                                        tau, b,
+                                        alpha, sig_alpha))) %>% 
       unnest(res)
     res %>% 
       mutate(runID = i, .before=tau) %>% 
@@ -254,61 +235,3 @@ if(ON_CLUSTER) {
 
 
 
-
-
-
-# right way ---------------------------------------------------------------
-
-# attempting to simulate data the right way
-#  - sorta following https://www.barelysignificant.com/post/icc/
-if (F) {
-  logit <- function(x) {
-    log(x/(1-x))
-  }
-  dlogit <- function(x) {
-    1/x + 1/(1-x)
-  }
-  ddlogit <- function(x) {
-    1/(1-x)^2 - 1/x^2
-  }
-  
-  inv_logit <- function(x) {
-    1/(1+exp(-x))
-  }
-  
-  # simulate alpha_j: 
-  #  - GOAL: p is "...base rates will likely be in the 15-20% range..."
-  #  - IDEA: set mu_alpha, sig_alpha such that p_0j ~ N(0.175, 0.01^2),
-  #     i.e., approximate logit(p_0j) with a N(mu_alpha, sig_alpha^2)
-  #  - METHOD: https://en.wikipedia.org/wiki/Taylor_expansions_for_the_moments_of_functions_of_random_variables
-  mu_p <- 0.175
-  sig_p <- 0.01
-  mu_alpha <- logit(mu_p) + ddlogit(mu_p)*sig_p^2/2
-  sig_alpha <- sqrt(dlogit(mu_p)^2*sig_p^2 - ddlogit(mu_p)^2*sig_p^4/4)
-  
-  # simulate tau_j: 
-  #  - GOAL: txeff is "..something in the 2-4 pp range..."
-  mu_txeff <- 0.2
-  sig_txeff <- 0.1
-  rho <- 0
-  
-  # check that approximations look okay
-  if (F) {
-    # alpha dist approximation
-    x <- rnorm(10000, mean=mu_p, sd=sig_p)
-    x_approx <- rnorm(10000, mean=mu_alpha, sd=sig_alpha)
-    tibble(
-      x = logit(x),
-      x_approx = x_approx
-    ) %>% 
-      pivot_longer(everything()) %>% 
-      ggplot(aes(x=value, color=name)) +
-      geom_density()
-    
-    # tau dist approximation
-  }
-  
-  # from method 1 in: https://www.barelysignificant.com/post/icc/
-  #  - note: icc is function of sig_alpha, so it's not user-specified
-  icc <- sig_alpha^2/(sig_alpha^2 + pi^2/3)
-}

@@ -2,6 +2,7 @@
 # analyzing case study results
 
 # note: lots of divergences and ESS warnings...
+#  - checked them, it's actually not so bad
 
 
 require(tidyverse)
@@ -9,12 +10,14 @@ require(wesanderson)
 require(latex2exp)
 
 res <- read_csv("case_study/case_study_results.csv")
+res <- read_csv("case_study/case_study2_results.csv")
 site_size_key <- tibble(
   sid = 1:10,
   n = c(551, 412, 343, 173, 464, 544, 499, 396, 197, 116)
 )
 
 res <- read_csv("case_study/case_study_states_results.csv")
+res <- read_csv("case_study/case_study2_states_results.csv")
 site_size_key <- tibble(
   sid = 1:5,
   n = c(551, 928, 895, 1008, 309)
@@ -183,3 +186,41 @@ res_sum %>%
 
 
 
+
+
+
+# plotting summaries, sim 2 -----------------------------------------------
+
+# summarize results
+res_sum <- res %>% 
+  mutate(reject = (q5 >= 0) | (q95 <= 0),
+         covered = (q5 <= tau_j) & (q95 >= tau_j),
+         moe = (q95-q5)/2) %>% 
+  group_by(tau, b, alpha, sig_alpha, sid, method) %>% 
+  summarize(coverage = mean(covered),
+            reject_rate = mean(reject),
+            avg_moe = mean(moe)) %>% 
+  left_join(site_size_key, by="sid")
+
+### varying b
+
+temp <- res_sum %>% 
+  filter(method=="single")
+# average moe
+res_sum %>% 
+  filter(method=="MLM") %>% 
+  mutate(b = as.factor(b)) %>% 
+  ggplot(aes(x=n, y=avg_moe)) +
+  geom_point(aes(color=b)) +
+  geom_line(aes(color=b, group=b)) +
+  
+  # add in baseline single-site stuff
+  geom_point(data=temp) +
+  geom_line(data=temp, lty="dashed") +
+  
+  scale_color_manual(values=pal[c(1,3,5)]) +
+  labs(y = "Average margin of error",
+       x = "Site size",
+       color = TeX("$b$")) +
+  my_theme
+ggsave("writeup/images/case_study2_states_moe.png")
