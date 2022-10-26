@@ -5,6 +5,8 @@
 
 
 require(tidyverse)
+require(wesanderson)
+require(latex2exp)
 
 res <- read_csv("case_study/case_study_results.csv")
 
@@ -15,6 +17,8 @@ site_size_key <- tibble(
 
 my_theme <- theme_minimal() +
   theme(axis.line = element_line())
+pal <- wes_palette("Zissou1", 5, type="continuous")
+
 
 
 # plotting raw intervals --------------------------------------------------
@@ -96,13 +100,26 @@ res_sum %>%
 
 ### varying sig_tau
 
+temp <- res_sum %>% 
+  filter(rho == 0, method=="single", sig_tau==0.01)
 # average moe
 res_sum %>% 
-  filter(rho == 0) %>% 
-  ggplot(aes(x=n, y=avg_moe, color=sig_tau)) +
-  geom_point() +
-  geom_line(aes(group=sig_tau)) +
-  facet_wrap(~method)
+  filter(rho == 0, method=="MLM") %>% 
+  mutate(sig_tau = as.factor(sig_tau)) %>% 
+  ggplot(aes(x=n, y=avg_moe)) +
+  geom_point(aes(color=sig_tau)) +
+  geom_line(aes(color=sig_tau, group=sig_tau)) +
+  
+  # add in baseline single-site stuff
+  geom_point(data=temp) +
+  geom_line(data=temp, lty="dashed") +
+  
+  scale_color_manual(values=pal) +
+  labs(y = "Average margin of error",
+       x = "Site size",
+       color = TeX("$\\sigma_\\tau$")) +
+  my_theme
+ggsave("writeup/images/case_study_moe.png")
 
 # average coverage
 res_sum %>% 

@@ -4,14 +4,13 @@
 require(tidyverse)
 require(glue)
 
-dir <- "final_sims"
-# dir <- "results2"   # results2 is ONLY J=20 cases
-fhead <- "full_study"
+dir <- "case_study"
+fhead <- "res_"
 
 all_files <- list.files(dir)
 
 max_runID <- 0
-all_dfs <- all_files[str_detect(all_files, glue("{fhead}-"))] %>%
+all_dfs <- all_files[str_detect(all_files, glue("{fhead}"))] %>%
   map(function(fname) {
     df <- read_csv(glue("{dir}/{fname}")) %>%
       mutate(runID = runID + max_runID)
@@ -22,6 +21,12 @@ res <- bind_rows(all_dfs)
 
 rm(all_files)
 rm(all_dfs)
+
+if (F) {
+  foo <- res %>% 
+    mutate(runID = rep(401:1000, each=300))
+  write_csv(foo, "case_study/case_study_results.csv", append=T)
+}
 
 if (T) {
   # for full_study: subset into smaller studies

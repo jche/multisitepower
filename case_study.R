@@ -12,6 +12,8 @@ require(tidyverse)
 require(mvtnorm)
 require(rstan)
 
+ON_CLUSTER <- T
+
 
 # simulate data -----------------------------------------------------------
 
@@ -181,30 +183,51 @@ df_sim <- expand_grid(
   rho = c(0, 0.3, 0.6)
 )
 
-for (i in 1:1000) {
-  res <- df_sim %>% 
-    rowwise() %>% 
-    mutate(res = list(run_case_study(site_sizes,
-                                     tau, sig_tau,
-                                     alpha, sig_alpha,
-                                     rho))) %>% 
-    unnest(res)
+if(ON_CLUSTER) {
+  require(uuid)
+  require(glue)
   
-  # store results
-  FNAME <- "case_study/case_study_results.csv"
-  if (file.exists(FNAME)) {
-    res %>%
-      mutate(runID = counter, .before=tau) %>%
-      write_csv(FNAME, append=T)
-    
-    counter <- counter+1
-  } else {
-    counter <- 1
+  for (i in 1:10) {
+    FNAME <- glue("case_study_results/res_{str_sub(UUIDgenerate(), 1, 7)}.csv")
+    res <- df_sim %>% 
+      rowwise() %>% 
+      mutate(res = list(run_case_study(site_sizes,
+                                       tau, sig_tau,
+                                       alpha, sig_alpha,
+                                       rho))) %>% 
+      unnest(res)
     res %>% 
-      mutate(runID = counter, .before=tau) %>% 
+      mutate(runID = i, .before=tau) %>% 
       write_csv(FNAME)
   }
+} else { # running locally
+  for (i in 1:1000) {
+    res <- df_sim %>% 
+      rowwise() %>% 
+      mutate(res = list(run_case_study(site_sizes,
+                                       tau, sig_tau,
+                                       alpha, sig_alpha,
+                                       rho))) %>% 
+      unnest(res)
+    
+    # store results
+    FNAME <- "case_study/case_study_results.csv"
+    if (file.exists(FNAME)) {
+      res %>%
+        mutate(runID = counter, .before=tau) %>%
+        write_csv(FNAME, append=T)
+      
+      counter <- counter+1
+    } else {
+      counter <- 1
+      res %>% 
+        mutate(runID = counter, .before=tau) %>% 
+        write_csv(FNAME)
+    }
+  }
 }
+
+
 
 
 
