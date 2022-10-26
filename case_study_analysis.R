@@ -9,11 +9,18 @@ require(wesanderson)
 require(latex2exp)
 
 res <- read_csv("case_study/case_study_results.csv")
-
 site_size_key <- tibble(
   sid = 1:10,
   n = c(551, 412, 343, 173, 464, 544, 499, 396, 197, 116)
 )
+
+res <- read_csv("case_study/case_study_states_results.csv")
+site_size_key <- tibble(
+  sid = 1:5,
+  n = c(551, 928, 895, 1008, 309)
+)
+
+
 
 my_theme <- theme_minimal() +
   theme(axis.line = element_line())

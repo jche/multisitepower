@@ -5,7 +5,7 @@ require(tidyverse)
 require(glue)
 
 dir <- "case_study"
-fhead <- "res_"
+fhead <- "stateres_"
 
 all_files <- list.files(dir)
 
@@ -24,8 +24,8 @@ rm(all_dfs)
 
 if (F) {
   foo <- res %>% 
-    mutate(runID = rep(401:1000, each=300))
-  write_csv(foo, "case_study/case_study_results.csv", append=T)
+    mutate(runID = rep(1:1000, each=150))
+  write_csv(foo, "case_study/case_study_states_results.csv")
 }
 
 if (T) {
