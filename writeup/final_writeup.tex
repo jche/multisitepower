@@ -439,22 +439,34 @@ Naturally, the largest colleges enjoy the smallest average margins of error, tho
 The average margin of error is not sensitive to $\rho_{01}$, so we exclude those results, but it is very sensitive to the amount of cross-site treatment-effect heterogeneity.
 For example, as $\sigma_\tau$ increases from 1 percentage point to 5 percentage points, the average margin of error for the smallest site increases by nearly 50\%.
 
-The state-level analysis produces similar results.
-Figure \ref{fig:case_study_states_moe}
+The state-level analysis produces slightly more promising results.
+Figure \ref{fig:case_study_states_moe} replicates Figure \ref{fig:case_study_moe}, with points being states rather than individual colleges.
 \begin{figure}[ht]
     \centering
     \includegraphics[width=\textwidth]{writeup/images/case_study_states_moe.png}
     \caption{Average margin of error in case study. Points correspond to prospective sample sizes within 5 states. Dashed black line represents single-site-estimate margins of error.}
     \label{fig:case_study_states_moe}
 \end{figure}
+In the best case, MLMs reduce the largest state's average margin of error to approximately 3 percentage points, suggesting that we'd likely be able to detect reasonable effect sizes within that state.
 
-Overall, the case study suggests that while it may be challenging to precisely estimate effects within each college, it may be more reasonable to do so for states.
+The secondary simulation produces similar results, so we only visualize its results for the state-level analysis.
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{}
+    \caption{Caption}
+    \label{fig:my_label}
+\end{figure}
+
+
+Overall, the case study suggests that it will be challenging to precisely estimate effects within each college or state with the prospective dataset.
+While average margins of error will vary strongly with the true dispersion of the site-level treatment effects, they are generally larger or on the same order of magnitude as the expected 2-4 percentage point site-level treatment effect.
+Ideally we would increase the site-level sample sizes to improve estimate precision, but regardless, the simulation study helps to set expectations for the possible precision of the site-level treatment-effect estimates.
 
 \section{Conclusion}
 
 In many settings, analysts may wish to power multisite trials to consistently detect effects at individual sites.
-While this task appears straightforward at first glance, it is important to carefully consider how it interacts with the shrinkage models we use to estimate site-level treatment effects.
-In this paper, we suggest that simulating the average interval length is the clearest, simplest method to power multisite trials for site-level treatment effects.
+While this task appears straightforward at first glance, it is important to carefully consider how it interacts with the shrinkage models typically used to estimate site-level treatment effects.
+In this paper, we suggest that simulating the average error margin of the interval estimates is the clearest, simplest method to power multisite trials for site-level treatment effects.
 
 
 
