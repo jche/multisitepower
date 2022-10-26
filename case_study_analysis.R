@@ -21,6 +21,42 @@ pal <- wes_palette("Zissou1", 5, type="continuous")
 
 
 
+
+# plotting gamma distributions --------------------------------------------
+
+# mean: shape/rate, calibrate to 0.03
+# skew: 2/sqrt(shape), allow this to vary
+
+mn <- 0.03
+beta <- 1
+alpha <- mn*beta
+
+tibble(
+  mn = 0.03,
+  beta = c(50,150,250)
+) %>% 
+  mutate(alpha = mn*beta) %>% 
+  rowwise() %>% 
+  mutate(samps = list(rgamma(500000, shape=alpha, rate=beta))) %>% 
+  unnest(samps) %>% 
+  mutate(beta = as.factor(beta)) %>% 
+  ggplot(aes(x=samps, color=beta)) +
+  geom_density(aes(group=beta), size=1) +
+  scale_color_manual(values=pal[c(1,3,5)]) +
+  # facet_grid(~beta, scales="free_x") +
+  theme_minimal() +
+  theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.line = element_line(),
+        legend.position = c(0.8, 0.6),
+        legend.background = element_rect(color = "black",
+                                         fill = "white")) +
+  labs(y = "",
+       x = TeX("$\\tau_j$"),
+       color = "     b")
+ggsave("writeup/images/gamma.png")
+
+
 # plotting raw intervals --------------------------------------------------
 
 res %>% 
