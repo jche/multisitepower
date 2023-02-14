@@ -38,8 +38,9 @@
 \usepackage{setspace}
 \doublespacing
 
+% Bibliography
 \usepackage{natbib}
-\bibliographystyle{rusnat}
+\bibliographystyle{unsrtnat}
 
 % Editing macros
 \usepackage{color}
@@ -48,9 +49,6 @@
 \newcommand\cmntC[1]{\cmnt{#1}{Che}}
 \newcommand\awk{{{\color{red} {$\leftarrow$ Awkward phrasing}}\qquad}}
 \newcommand\cmntMp[1]{{\color{red} $\leftarrow$ {\em #1 -Miratrix} \qquad}}
-
-\usepackage{natbib}
-\bibliographystyle{rusnat}
 
 %opening
 % \title{On power analyses for individual site impacts in multisite trials}
@@ -78,14 +76,18 @@ Researchers typically power multisite trials to estimate whether their intervent
 They can use existing tools to design multisite trials that have high power for this overall average treatment effect [add citation, PUMP or something else?].
 If desired, researchers can also power multisite trials to detect given levels of cross-site impact variation [add citation].
 
-In many applications, however, it may also be important to powerfully estimate the treatment effects within individual sites.
-Site stakeholders are often much more interested in whether the treatment improved outcomes within their individual site than in whether the treatment appeared to be effective overall.
-Estimation of site-level treatment effects becomes particularly important when researchers suspect substantial unmodeled heterogeneity across sites, which occurs in many settings.
+In many applications, however, it may also be important to estimate the treatment effects within individual sites.
+Site stakeholders, for example, are often much more interested in whether the treatment improved outcomes within their individual site than in whether the treatment appeared to be effective overall.
+Estimation of site-level treatment effects becomes particularly important when researchers suspect substantial unmodeled impact heterogeneity across sites, which occurs in many settings.
 
 This paper provides guidelines for researchers interested in designing multisite trials to effectively estimate individual site-level treatment effects.
 We suggest that to achieve this goal, researchers should focus on characterizing the average margins of error from the interval estimates produced by their estimation method of choice, for their design of choice.
 We support our suggestion via a careful study of the site-level interval estimates produced by standard methods for analyzing multisite trials, clarifying common points of confusion regarding their interpretation.
-We then use a detailed simulation study to illustrate how design factors affect average margin of error.
+We then use a detailed simulation study to illustrate how design factors affect average margin of error for individual site-level estimates.
+
+To our knowledge, multisite trials research contains limited guidance on conceptualizing and calculating power for individual site-level effects.
+Our primary contribution leverages a wide literature to construct a simple framework for conducting power analyses in these settings, motivated by the question of whether a prospective study may be sufficient to detect these individual effects.
+We also provide a software package to help those designing their own experiments conduct these analyses.
 
 The paper proceeds as follows.
 Section 2 provides background on site-level treatment-effect estimation in multisite trials.
@@ -97,18 +99,16 @@ Finally, in Section 6 we provide a useful template for a power analysis conducte
 
 \section{Background}
 
-\subsection{Mathematical framework}
-
 In a multisite trial, the same randomized trial is conducted within each of several sites.
 Rather than separately estimating the treatment effect for each site, it is well known that shrinking the noisy site-level treatment-effect estimates toward an overall average produces a better collection of estimates in terms of mean-squared error \citep{james1961estimation}.
 For $J$ total sites, this shrinkage can be motivated by the following mathematical framework:
 \begin{align*}
-    \hat{\tau}_j &\sim N(\tau_j, \text{s.e}_j), \ \ j=1,\dots,J \\
+    \hat{\tau}_j &\sim N(\tau_j, \text{se}_j), \ \ j=1,\dots,J \\
     % \tau_j &\stackrel{i.i.d.}{\sim} G.
     \tau_j &\sim G.
 \end{align*}
-Under this framework, site-level treatment-effect estimates $\hat{\tau}_j$ are noisy realizations of true site-level treatment effects $\tau_j$, with observed standard errors $\text{s.e}_j$.\footnote{If the standard errors $\text{s.e}_j$ are estimated using only data from site $j$, the multisite trial can be viewed as a ``planned meta-analysis.''
-In this paper, we simply assume that the $\text{s.e}_j$ values are fixed, so they can be computed using data from all sites.
+Under this framework, site-level treatment-effect estimates $\hat{\tau}_j$ are noisy realizations of true site-level treatment effects $\tau_j$, with observed standard errors $\text{se}_j$.\footnote{If the standard errors $\text{se}_j$ are estimated using only data from site $j$, the multisite trial can be viewed as a ``planned meta-analysis.''
+In this paper, we simply assume that the $\text{se}_j$ values are fixed, so they can be computed using data from all sites.
 This accommodates a wide range of popular models for analyzing multisite trials, e.g., the fixed-intercepts, random coefficients model proposed in \cite{bloom2017using}.}
 We then assume that the true site-level treatment effects $\tau_j$ themselves come from some distribution $G$.
 The assumed form of this distribution $G$ determines the level of shrinkage that should be applied to the site-level treatment-effect estimates.
@@ -116,7 +116,7 @@ The assumed form of this distribution $G$ determines the level of shrinkage that
 \subsection{Estimation methods}
 
 There are many different methods for producing point and interval estimates of site-level treatment effects.
-These methods can generally be categorized using two factors: whether they are parametric or nonparametric, and whether they are empirical Bayes or fully Bayesian.
+These methods can generally be categorized using two factors: whether they are parametric or nonparametric, and whether they are completely unpooled, empirical Bayes, or fully Bayesian.
 % The many methods for estimating site-level treatment effects under the framework above can generally be categorized using two factors: whether they are parametric or nonparametric, and whether they are empirical Bayes or fully Bayesian.
 
 Applied researchers typically use parametric methods to analyze multisite trials.
@@ -134,7 +134,7 @@ In this paper, we focus on parametric empirical Bayes and Bayesian methods for a
 While parametric models are relatively simple, advice for conducting power analyses on them remains unclear, particularly for the estimation of individual site-level treatment effects.
 We aim to clarify the use of parametric models for this task and leave the evaluation of nonparametric methods to future work.
 
-\subsection{Motivation}
+\subsection{Empirical Bayes coverage}
 
 To conduct power analyses for the site-level treatment effects $\tau_j$ in multisite trials, we must first define coverage for the interval estimates of the $\tau_j$ values.
 In a single-site randomized trial, standard interval estimates cover the site's true treatment effect $100(1-\alpha)$\% of the time for a given significance level $\alpha$, across (hypothetical) repeated trials.
@@ -175,20 +175,20 @@ where the $\alpha_j$ are random site-level intercepts and the $\tau_j$ are the t
 We conduct the simulation in effect-size units, so $Var(Y_{ij} \mid Z_{ij}=0)=1$, i.e., $\sigma^2_\alpha + \sigma^2_y = 1$.
 We also set $\rho_{10}=0$ so the intercept and treatment random effects are uncorrelated.
 
-For simplicity, we condense the data within each site to an average treatment effect $\hat{\tau}_j$ and an estimated standard error $\text{s.e}_j$ before applying shrinkage estimators.
+For simplicity, we condense the data within each site to an average treatment effect $\hat{\tau}_j$ and an estimated standard error $\text{se}_j$ before applying shrinkage estimators.
 We let $\hat{\tau}_j$ be the simple difference-in-means estimate, $\hat{\tau}_j = \frac{1}{n_{1j}} \sum_i Z_{ij}Y_{ij} - \frac{1}{n_{0j}} \sum_i (1-Z_{ij})Y_{ij}$, where $n_{1j}$ and $n_{0j}$ represent the number of treated and control units within site $j$, respectively.
-The estimate of $\text{s.e}_j$ varies with the analytic method; meta-analytic approaches are restricted to using standard errors separately estimated within each site, while other methods can pool information across sites to estimate these standard errors.
-Our condensed data ultimately takes the form:
-\begin{align*}
-    \hat{\tau}_j &\sim N(\tau_j, \text{s.e}_j), \ \ j=1,\dots,J \\
-    \tau_j &\sim N(\tau, \sigma_\tau^2).
-\end{align*}
+The estimate of $\text{se}_j$ varies with the analytic method; meta-analytic approaches are restricted to using standard errors separately estimated within each site, while other methods can pool information across sites to estimate these standard errors.
+% Our condensed data ultimately takes the form:
+% \begin{align*}
+%     \hat{\tau}_j &\sim N(\tau_j, \text{se}_j), \ \ j=1,\dots,J \\
+%     \tau_j &\sim N(\tau, \sigma_\tau^2).
+% \end{align*}
 
 \subsection{Analytic methods}
 
 We apply two different methods to produce interval estimates for each site-level treatment effect.
-For a baseline comparison, we record 90\% confidence intervals on $\tau_j$ from single-site t-tests, conducted separately at each site (``Single'').
-We also record the 90\% credible intervals on $\tau_j$ from a fully Bayesian multilevel model (``MLM''), with $G \sim N(\tau, \sigma^2)$, priors $\tau \sim N(0,5^2)$ and $\sigma \sim N(0,1)$, and treatment-condition-pooled site-level standard error estimates \citep{bloom2017using}.\footnote{Specifically, we let $\text{s.e}_j = \frac{\sigma_1^2}{n_{1j}} + \frac{\sigma_0^2}{n_{0j}}$, where $\sigma_{1}$ and $\sigma_{0}$ are estimates of the observation-level outcome variance for treated and control units, respectively, pooled across all sites.}
+For a baseline comparison, we record 90\% confidence intervals on $\tau_j$ from single-site t-tests, conducted separately at each site using data only from that site (``Single'').
+We also record the 90\% credible intervals on $\tau_j$ from a fully Bayesian multilevel model (``MLM''), with $G \sim N(\tau, \sigma^2)$, priors $\tau \sim N(0,5^2)$ and $\sigma \sim N(0,1)$, and treatment-condition-pooled site-level standard error estimates \citep{bloom2017using}.\footnote{Specifically, we let $\text{se}_j = \frac{\sigma_1^2}{n_{1j}} + \frac{\sigma_0^2}{n_{0j}}$, where $\sigma_{1}$ and $\sigma_{0}$ are estimates of the observation-level outcome variance for treated and control units, respectively, pooled across all sites.}
 
 We choose to use a fully Bayesian model for two reasons.
 First, Bayesian models provide a standard framework for model comparison, since many parametric empirical Bayes approaches are equivalent to Bayesian models with particular priors.
@@ -203,19 +203,17 @@ Though misspecification affects the performance of these estimators, it does not
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Illustrative example}
+\section{How should we think about coverage and power for individual sites?}
 
-\subsection{Single simulation}
-
-We highlight the main ideas in this paper using a single simulated dataset.
-For 100 simulated $\tau_j$ values, Figure \ref{fig:shrinkageplot} shows the 90\% interval estimates produced by the Bayesian multilevel model and single-site t-tests.
+We highlight the main ideas in this paper using a single simulated dataset of 100 sites.
+Figure \ref{fig:shrinkageplot} shows the 90\% interval estimates produced by the Bayesian multilevel model and single-site t-tests for each of the 100 sites.
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{shrinkageplot}
 	\caption{Interval estimates for one simulated dataset. Intervals overlapping the dotted line cover their respective true $\tau_j$ values.}
 	\label{fig:shrinkageplot}
 \end{figure}
-In this simulation, 90 of the MLM intervals and 91 of the single-site intervals contain their respective true $\tau_j$ values.
+In this example, overall coverage is roughly 90\% as expected; 90 of the MLM intervals and 91 of the single-site intervals contain their respective true $\tau_j$ values.
 
 The two methods, however, achieve this approximate 90\% coverage in different ways.
 As seen in Figure \ref{fig:shrinkageplot}, the MLM shrinks its point estimates toward the overall average.
@@ -250,6 +248,8 @@ As demonstrated in the illustrative example, MLM shrinkage promotes this behavio
 This comes at the cost of poor interval coverage for sites that happen to have extreme $\tau_j$ values.
 Site stakeholders, however, never know the true $\tau_j$ values; as a result, it would be unusual to interpret intervals and make decisions conditional on this unknown information.
 
+\subsection{A full simulation}
+
 To more precisely quantify these ideas of coverage conditional on $\tau_j$ or $\hat{\tau}_j$ value, we simulate 1000 multisite trial datasets and summarize the results in the figures below.
 In a traditional power analysis, the analyst posits an effect size $c$ and computes power for that effect size.
 An analogous procedure for the site-level treatment effects in a multisite trial is to compute power for each true site-level treatment effect size $\tau_j$.
@@ -272,7 +272,7 @@ Figure \ref{fig:pcp1} visualizes the results of a power simulation under this se
 \end{figure}
 Figure \ref{fig:pp1} plots the average rejection rate against the average site size for sites with $\tau_j =$ 0, 0.2, and 0.4.
 Clearly, MLMs improve power relative to the single-site interal estimates.
-Unfortunately, we also notice that when $\tau_j = 0$, shrinkage causes MLMs to make false rejections at a rate higher than $\alpha=0.1$.
+Unfortunately, we also notice that the curve corresponding to $\tau_j = 0$ goes above the horizontal dashed line at $\alpha=0.1$, i.e., when $\tau_j = 0$, shrinkage causes MLMs to make false rejections at a rate higher than $\alpha=0.1$.
 As previously noted, this is due to the fact that the interval estimates produced by MLMs undercover extreme values of $\tau_j$ (Figure \ref{fig:cp1}).
 
 Figure \ref{fig:pp2} illustrates power conditional on \textit{estimated} site-level treatment effects $\hat{\tau}_j$.
@@ -307,20 +307,23 @@ Without shrinkage, though, naive t-test intervals are too noisy to be reliable i
 
 To avoid these challenges, we suggest that researchers focus on characterizing the average length of the interval estimates produced by their method of choice, across the posited distribution of $\tau_j$ values.
 Averaging any metric of choice across the distribution of $\tau_j$ achieves two goals.
-On a basic level, doing so mirrors the concept behind empirical Bayes coverage, which is what most shrinkage methods aim to achieve.
-More practically, averaging across $\tau_j$ values results in simpler prospective power analyses.
+On a basic level, doing so mirrors the concept behind empirical Bayes coverage, which considers average coverage across the distribution of $\tau_j$.
+More practically, averaging interval lengths across $\tau_j$ values results in simpler prospective power analyses.
 Prior to conducting a multisite trial, it is difficult to predict where a particular site's treatment effect $\tau_j$ may fall in the distribution $G$.
-Since sites are exchangeable, however, analyzing the average performance of an interval estimator gives some indication of how that estimator will perform for each particular site, even without specifying each site's $\tau_j$ value.
+Analyzing the average performance of an interval estimator, however, gives some indication of how that estimator will perform for any particular site, even without specifying each site's $\tau_j$ value.
 
 We suggest using margin of error as the metric of choice to simplify interpretation.
-We would ideally like to consider some form of average minimum detectable effect size (MDES), so that the multisite trial could be powered to consistently detect a particular effect size.
+The margin of error is half the width of a symmetric interval estimate, often calculated as roughly two standard errors (for $\alpha=0.05$).
+Given a significance level $\alpha$, the margin of error may be thought of as the worst-case distance between our estimate and the truth.
+Ideally, we would consider some form of average minimum detectable effect size (MDES), so that the multisite trial could be powered to consistently detect a particular effect size.
 Unfortunately, it makes no sense to average MDES values across the distribution of $\tau_j$ values, since the MDES values themselves are the minimum $\tau_j$ values that achieve 80\% power.
 Error margins, on the other hand, can be averaged across the distribution of $\tau_j$ values while still maintaining some of the primary motivations behind MDES.
 Researchers can design a multisite trial to achieve some acceptable average margin of error for the site-level treatment effects.
 Then, as a rule of thumb, the study would generally be powerful enough to detect effects larger than this average margin of error.
 
-[NOTE: could do an interval length per $\tau_j$ value plot... essentially would show that $\tau_j=0.2$ has shorter intervals and extreme $\tau_j$ has wider intervals, not clear if this is helpful]
+% [NOTE: could do an interval length per $\tau_j$ value plot... essentially would show that $\tau_j=0.2$ has shorter intervals and extreme $\tau_j$ has wider intervals, not clear if this is helpful]
 
+TODO: see if Luke's comment here can be implemented.
 [One other motivation that I like, but it's not precise:
 Average power begs the question: for which values of $\tau_j$ are the intervals more or less powerful?
 This is a sad question, since conditioning on $\tau_j$ makes MLMs look bad.
@@ -333,10 +336,12 @@ This is a happier question.]
 
 \subsection{Setup}
 
-We conduct a simulation study to explore trends in how different data-generating factors affect average margin of error.
-In particular, we let the number of sites $J = 10, 25, 100$; the overall average treatment effect $\tau = 0.1, 0.2, 0.3$; the cross-site effect heterogeneity $\sigma^2_\tau = 0.1, 0.2, 0.3$; and the intraclass correlation coefficient $ICC \equiv \frac{\sigma^2_\alpha}{\sigma^2_\alpha + \sigma^2_y} = 0.1, 0.2, 0.3$ to mirror standard data settings in education trials \citep{weiss2017much}.
+We conduct a simulation study to explore trends in how different characteristics of a multisite RCT might affect average margin of error.
+In particular, we let the number of sites $J = 10, 25, 100$; the overall average treatment effect $\tau = 0.1, 0.2, 0.3$; the cross-site effect heterogeneity $\sigma^2_\tau = 0.1, 0.2, 0.3$; and the intraclass correlation coefficient $ICC \equiv \frac{\sigma^2_\alpha}{\sigma^2_\alpha + \sigma^2_y} = 0.1, 0.2, 0.3$.
+These choices are intended to mirror standard data settings in education trials \citep{weiss2017much};
+we provide code so researchers may replicate our simulations with other parameters of interest.
 To keep the simulation simple, we use the illustrative example simulation as our base case ($J=25$, $\bar{n}=5,10,\dots,200$, $\tau=\sigma_\tau=ICC=0.2$) and study the main effects of varying these factors one at a time.
-For each set of data-generating parameters, we simulate 10,000 total sites.\footnote{We simulate 1000 datasets for $J=10$, 400 datasets for $J=25$, and 100 datasets for $J=100$.}
+For each set of data-generating parameters, we simulate 10,000 total sites.\footnote{We keep the total number of sites constant across data-generating parameters to clarify our visualizations, i.e., we simulate 1000 datasets for $J=10$, 400 datasets for $J=25$, and 100 datasets for $J=100$.}
 
 \subsection{Results}
 
