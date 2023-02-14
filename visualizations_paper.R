@@ -436,6 +436,11 @@ if (T) {
   }
   
   length_plot <- function(d, color_var, color_caption) {
+    baseline_length <- full_study_J %>% 
+      filter(method == "Single") %>% 
+      group_by(nbar) %>% 
+      summarize(interval_length = mean(q95 - q5)/2)
+    
     d %>% 
       filter(method == "MLM") %>%
       mutate(across({{color_var}}, ~as.factor(.))) %>% 
@@ -445,6 +450,9 @@ if (T) {
       geom_point(alpha=0.5) +
       geom_line(aes(group={{color_var}}),
                 size=1) +
+      geom_line(data  = baseline_length,
+                color = "black",
+                lty   = "dashed") +
       # facet_wrap(~method) +
       scale_color_manual(values = c(pal[c(1,3,5)])) +
       coord_cartesian(ylim = c(0,1)) +
