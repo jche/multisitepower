@@ -10,7 +10,7 @@ require(wesanderson)
 require(latex2exp)
 
 res <- read_csv("case_study/case_study_results.csv")
-res <- read_csv("case_study/case_study2_results.csv")
+# res <- read_csv("case_study/case_study2_results.csv")
 site_size_key <- tibble(
   sid = 1:10,
   n = c(551, 412, 343, 173, 464, 544, 499, 396, 197, 116)
@@ -160,12 +160,14 @@ res_sum %>%
   geom_point(data=temp) +
   geom_line(data=temp, lty="dashed") +
   
+  expand_limits(y = 0) +
   scale_color_manual(values=pal) +
   labs(y = "Average margin of error",
        x = "Site size",
        color = TeX("$\\sigma_\\tau$")) +
   my_theme
 ggsave("writeup/images/case_study_moe.png")
+ggsave("writeup/images/case_study_states_moe.png")
 
 # average coverage
 res_sum %>% 
@@ -218,6 +220,7 @@ res_sum %>%
   geom_point(data=temp) +
   geom_line(data=temp, lty="dashed") +
   
+  expand_limits(y=0) +
   scale_color_manual(values=pal[c(1,3,5)]) +
   labs(y = "Average margin of error",
        x = "Site size",
