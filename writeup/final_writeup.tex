@@ -65,6 +65,13 @@
 %  - overall average treatment effect  // overall impact?
 %  - site-level treatment effect  // site impacts?
 
+\begin{abstract}
+    When conducting multisite trials, stakeholders often want precise estimates of site-level treatment effects.
+    This paper provides advice for powering multisite trials to achieve this goal.
+    We clarify common misconceptions about the properties of interval estimates in multisite trials and propose the use of an average margin-of-error metric for power analyses in these settings.
+    We support our suggestions with an extensive simulation study and provide an example power analysis for the Scaling Up College Completion Efforts for Student Success (SUCCESS) initiative.
+\end{abstract}
+
 \section{Introduction}
 
 Researchers typically power multisite trials to estimate whether their intervention of interest improves outcomes on average, across all sites.
@@ -84,7 +91,7 @@ The paper proceeds as follows.
 Section 2 provides background on site-level treatment-effect estimation in multisite trials.
 In Section 3 we introduce our simulation framework and modeling methods.
 Section 4 steps through an illustrative example that motivates the suggestions we make in this paper, and Section 5 elaborates via an extensive simulation study.
-Finally, in Section 6 we provide a useful template for a power analysis conducted under our proposed framework, based on a real-world example.
+Finally, in Section 6 we provide a useful template for a power analysis conducted under our proposed framework, based on the Scaling Up College Completion Efforts for Student Success initiative.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -234,9 +241,14 @@ We notice that the large MLM estimates are more clustered toward the right-hand 
 In other words, the large MLM estimates are more likely to correspond to truly large values of $\tau_j$.
 
 This example reviews how to properly interpret the interval estimates produced by MLMs.
-While specific coverage properties depend on model specification \citep{armstrong2020robust}, MLM intervals will generally contain their respective true parameters at close to the correct rate.
-Given observed data, each interval estimate has a high probability of containing its respective $\tau_j$ value.
+While specific coverage properties depend on model specification \citep{armstrong2020robust}, MLM intervals will generally contain their respective true parameters at close to the correct rate; given observed data, each interval estimate has a high probability of containing its respective $\tau_j$ value.
 MLM shrinkage means, however, that extreme $\tau_j$ values will categorically be difficult to correctly estimate.
+This property is theoretically concerning but leads to few issues in practice.
+After a multisite trial is analyzed, each site stakeholder receives an interval estimate for the true treatment effect $\tau_j$ at their site.
+Extreme interval estimates motivate changes in policy; as such, it is very important that extreme interval estimates indeed correspond to extreme $\tau_j$ values.
+As demonstrated in the illustrative example, MLM shrinkage promotes this behavior, while single-site estimates do not.
+This comes at the cost of poor interval coverage for sites that happen to have extreme $\tau_j$ values.
+Site stakeholders, however, never know the true $\tau_j$ values; as a result, it would be unusual to interpret intervals and make decisions conditional on this unknown information.
 
 To more precisely quantify these ideas of coverage conditional on $\tau_j$ or $\hat{\tau}_j$ value, we simulate 1000 multisite trial datasets and summarize the results in the figures below.
 In a traditional power analysis, the analyst posits an effect size $c$ and computes power for that effect size.
@@ -357,7 +369,7 @@ Researchers should carefully consider a range of reasonable values for $\sigma_\
 
 Varying $\tau$ and $ICC$ has little effect on average interval length in our simulations, so we omit these results.
 The simulations sample $\tau_j \sim N(\tau, \sigma_\tau^2)$, so shifting $\tau$ naturally has no effect on average interval length.
-If there is good reason to suspect that the site-level treatment effects do not come from a location family of distributions, however, it may become necessary to specify reasonable values of $\tau$ for a power analysis.
+If there is good reason to suspect that the site-level treatment effects do not come from a location family of distributions, however, it may become necessary to specify reasonable values of the overall average treatment effect for a power analysis.
 Increasing $ICC$ has very minimal effects on average interval length, since site-level intercepts do not affect estimated site-level treatment effects.\footnote{Our simulations are in effect-size units, i.e., $\sigma^2_\alpha + \sigma^2_y = 1$, so increasing $ICC$ decreases $\sigma^2_y$.
 As a result, increasing $ICC$ in our simulations leads to very slightly smaller average margins of error.}
 
@@ -439,30 +451,37 @@ Naturally, the largest colleges enjoy the smallest average margins of error, tho
 The average margin of error is not sensitive to $\rho_{01}$, so we exclude those results, but it is very sensitive to the amount of cross-site treatment-effect heterogeneity.
 For example, as $\sigma_\tau$ increases from 1 percentage point to 5 percentage points, the average margin of error for the smallest site increases by nearly 50\%.
 
-The state-level analysis produces similar results.
-Figure \ref{fig:case_study_states_moe}
+The state-level analysis produces slightly more promising results.
+Figure \ref{fig:case_study_states_moe} replicates Figure \ref{fig:case_study_moe}, with points being states rather than individual colleges.
 \begin{figure}[ht]
     \centering
     \includegraphics[width=\textwidth]{writeup/images/case_study_states_moe.png}
     \caption{Average margin of error in case study. Points correspond to prospective sample sizes within 5 states. Dashed black line represents single-site-estimate margins of error.}
     \label{fig:case_study_states_moe}
 \end{figure}
+In the best case, MLMs reduce the largest state's average margin of error to approximately 3 percentage points, suggesting that we'd likely be able to detect reasonable effect sizes within that state.
 
-Overall, the case study suggests that while it may be challenging to precisely estimate effects within each college, it may be more reasonable to do so for states.
+The secondary simulation produces similar results, so we only visualize its results for the state-level analysis.
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{writeup/images/case_study2_states_moe.png}
+    \caption{Average margin of error in secondary case study. Points correspond to prospective sample sizes within 5 states. Dashed black line represents single-site-estimate margins of error.}
+    \label{fig:case_study_2_states_moe}
+\end{figure}
+Similar to the first simulation, we notice that average margin of error decreases as the tails of the site-level treatment-effect distribution decrease.
+We again find that the best-case results in average margins of error of approximately 3 percentage points.
+
+Overall, the case study suggests that it will be challenging to precisely estimate effects within each college or state with the prospective dataset.
+While average margins of error will vary strongly with the true dispersion of the site-level treatment effects, they are generally larger or on the same order of magnitude as the expected 2-4 percentage point site-level treatment effect.
+Ideally we would increase the site-level sample sizes to improve estimate precision, but regardless, the simulation study helps to set expectations for the possible precision of the site-level treatment-effect estimates.
 
 \section{Conclusion}
 
 In many settings, analysts may wish to power multisite trials to consistently detect effects at individual sites.
-While this task appears straightforward at first glance, it is important to carefully consider how it interacts with the shrinkage models we use to estimate site-level treatment effects.
-In this paper, we suggest that simulating the average interval length is the clearest, simplest method to power multisite trials for site-level treatment effects.
-
-
-
-OTHER SIMULATION STUDY CONCLUSIONS:
-Use larger sites, not more sites.
-
-TO MOTIVATE OUR SUGGESTION:
-We provide an illustrative example to clarify how shrinkage interacts with coverage.
+While this task appears straightforward at first glance, it is important to carefully consider how it interacts with the shrinkage models typically used to estimate site-level treatment effects.
+In this paper, we suggest that simulating the average error margin of the interval estimates is the clearest, simplest method to power multisite trials for site-level treatment effects.
+The average margin of error provides a minimum-detectable-effect-size-style metric that avoids having to specify individual site-level treatment effects while still being practically interpretable.
+Our simulation and case studies show that the average margin of error is still primarily driven by within-site sample sizes, though decreasing cross-site treatment-effect heterogeneity and increasing the total number of sites can produce slight improvements.
 
 
 \bibliography{refs.bib}
