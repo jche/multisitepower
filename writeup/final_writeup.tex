@@ -355,7 +355,8 @@ if given a choice between the two, researchers interested in understanding site-
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{simstudy_J_length}
-	\caption{Average margin of error across different values of $J$ ($\tau=0.2$, $\sigma_\tau=0.2$, $ICC=0.2$).}
+	\caption{Average margin of error across different values of $J$ ($\tau=0.2$, $\sigma_\tau=0.2$, $ICC=0.2$).
+	    Dashed line represents average margin of error using single-site t-tests.}
 	\label{fig:results_J}
 \end{figure}
 
@@ -367,16 +368,18 @@ Researchers should carefully consider a range of reasonable values for $\sigma_\
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{simstudy_txsd_length}
-	\caption{Average margin of error across different values of $\sigma_\tau$ ($J=25$, $\tau=0.2$, $ICC=0.2$).}
+	\caption{Average margin of error across different values of $\sigma_\tau$ ($J=25$, $\tau=0.2$, $ICC=0.2$).
+	    Dashed line represents average margin of error using single-site t-tests.}
 	\label{fig:results_txsd}
 \end{figure}
 % Note: small $\sigma_\tau$ means large shrinkage, which means huge implications for interval interpretation
 
-Varying $\tau$ and $ICC$ has little effect on average interval length in our simulations, so we omit these results.
+Varying $\tau$ and the $ICC$ has little effect on average interval length in our simulations, so we omit these results.
 The simulations sample $\tau_j \sim N(\tau, \sigma_\tau^2)$, so shifting $\tau$ naturally has no effect on average interval length.
 If there is good reason to suspect that the site-level treatment effects do not come from a location family of distributions, however, it may become necessary to specify reasonable values of the overall average treatment effect for a power analysis.
-Increasing $ICC$ has very minimal effects on average interval length, since site-level intercepts do not affect estimated site-level treatment effects.\footnote{Our simulations are in effect-size units, i.e., $\sigma^2_\alpha + \sigma^2_y = 1$, so increasing $ICC$ decreases $\sigma^2_y$.
-As a result, increasing $ICC$ in our simulations leads to very slightly smaller average margins of error.}
+Increasing the $ICC$ has very minimal effects on average interval length.
+We conduct our simulations in effect-size units, i.e., $\sigma^2_\alpha + \sigma^2_y = 1$, so increasing $ICC$ decreases $\sigma^2_y$.
+As a result, increasing $ICC$ in our simulations leads to very slightly smaller average margins of error.
 
 Overall, the simulations show that site-level sample size is the primary driver of average margin of error.
 This result is intuitive; if site-level treatment effects are of interest, large site-level samples are required to precisely estimate them.
@@ -387,17 +390,15 @@ Increasing the number of sites also improves average margins of error, but by fa
 % TODO: highlight importance of correct interpretation when there's a bunch of shrinkage?
 % TODO: highlight absolute stuff. Like how hard it is to estimate precisely, even in our ``best'' data settings.
 
-\section{Case study}
-
-\subsection{Background: Scaling Up College Completion Efforts for Student Success (SUCCESS)}
+\section{Case study: Scaling Up College Completion Efforts for Student Success (SUCCESS)}
 
 % https://www.mdrc.org/project/scaling-college-completion-efforts-student-success-success#overview
 To illustrate our suggested approach for powering multisite trials to detect site-level treatment effects, we conduct an example power analysis.
-We base our case study on the Scaling Up College Completion Efforts for Student Success (SUCCESS) initiative designed by the Manpower Demonstration Research Corporation (MDRC).
+We base our case study on the Scaling Up College Completion Efforts for Student Success (SUCCESS) initiative designed by MDRC.
 SUCCESS aims to improve 3-year degree completion rates for traditionally underserved college students by implementing programs proven to work in these settings, such as ``frequent proactive advising; financial incentives tied to service usage; strategies focused on increasing academic momentum; and the use of real-time data to support student progress'' \citep{MDRCsuccess}.
 Our prospective study will be conducted in ten community colleges across five states, with projected sample sizes known in advance.
 Each school is interested in a principled estimate of the treatment effect at their site.
-Scaling the program would likely involve state funding, so we are also interested in understanding treatment effects within each state.
+Scaling the program would likely involve state funding, so we are also interested in understanding average treatment effects across colleges within each state.
 
 \subsection{Data-generating model}
 
@@ -417,12 +418,13 @@ To conduct the power analysis, we simulate data under the following simplified m
 		\sigma^2_\alpha & \rho_{01} \\  & \sigma^2_\tau
 	\end{bmatrix}\right).
 \end{align*}
-We truncate $p_{ij}$ to keep it within the interval (0,1).\footnote{We use this simple model rather than a logistic regression model for $p_{ij}$ for clarity, since it allows for direct translation of postulated effect sizes into the model.}
+We truncate $p_{ij}$ to keep it within the interval (0,1).\footnote{For context, we truncate fewer than 1\% of the $p_{ij}$ values for the data-generating parameters we consider in the simulations in this section.}
+We use this simplistic model rather than a logistic regression model for $p_{ij}$ for clarity, since it allows for direct translation of postulated effect sizes into the model.
 Past experimental evidence suggests that $\tau_j$ values are typically moderate, about 0-5 percentage points, though they can be as large as 18 percentage points.
 With the onset of COVID-19, however, early treatment-effect estimates suggest more moderate effects, in the 2-4 percentage point range.
 Base graduation rates are low, in the 15-20\% range.
 We therefore simulate data using $\alpha = 0.175$, $\sigma_\alpha=0.01$, and $\tau=0.03$.
-We let $\sigma_\tau \in \{0.1, 0.2, 0.3, 0.4, 0.5\}$ and $\rho_{01} \in \{0, 0.3, 0.6\}$.
+We let $\sigma_\tau \in \{0.01, 0.02, 0.03, 0.04, 0.05\}$ and $\rho_{01} \in \{0, 0.3, 0.6\}$.
 Because each site/state's projected sample size is already fixed and known in advance, we fix these values and aim to infer how precisely we can expect to estimate their treatment effects under the posited distribution of treatment effects.
 
 We also conduct a secondary simulation with a more realistic distribution for $(\alpha_j, \tau_j)$.
@@ -435,48 +437,50 @@ To capture this skew, we simulate site-level treatment effects from a Gamma dist
 \end{align*}
 We again use $\alpha = 0.175$ and $\sigma_\alpha=0.01$, but we fix the mean of the distribution of $\tau_j$ at 0.03 and vary its skew using the parameters $(1.5, 50)$, $(4.5, 150)$, and $(7.5, 250)$.
 Figure \ref{fig:gammas} shows the resulting distributions of site-level treatment effects.
-\begin{figure}
+\begin{figure}[t]
     \centering
     \includegraphics[width = \textwidth]{writeup/images/gamma.png}
     \caption{Gamma distributions considered for site-level treatment effects.}
     \label{fig:gammas}
 \end{figure}
+Note that we still use normal multilevel models to analyze these data even though they are misspecified, since we are interested in understanding the performance of standard modeling procedures in this setting.
 
 \subsection{Results}
 
 We first show the main results for the college-level analysis.
 Figure \ref{fig:case_study_moe} visualizes the average margins of error, plotted against the baseline single-site-estimate margins of error for comparison.
-\begin{figure}[ht]
+\begin{figure}[t]
     \centering
     \includegraphics[width=\textwidth]{writeup/images/case_study_moe.png}
-    \caption{Average margin of error in case study. Points correspond to prospective sample sizes at 10 community colleges. Dashed black line represents single-site-estimate margins of error.}
+    \caption{Average margin of error in case study with $\tau_j \sim N(0.03, \sigma_\tau$). Points correspond to prospective sample sizes at 10 community colleges. Dashed black line represents single-site-estimate margins of error.}
     \label{fig:case_study_moe}
 \end{figure}
-Naturally, the largest colleges enjoy the smallest average margins of error, though these margins unfortunately remain quite large, at roughly 4-5 percentage points.
+Naturally, the largest colleges enjoy the smallest average margins of error, though these margins unfortunately remain quite large.
+For example, the simulations indicate that the estimated effect at the largest site is expected to have a 4-5 percentage point margin of error, which is very substantial considering most effects are projected to be in the 0-5 percentage point range.
 The average margin of error is not sensitive to $\rho_{01}$, so we exclude those results, but it is very sensitive to the amount of cross-site treatment-effect heterogeneity.
 For example, as $\sigma_\tau$ increases from 1 percentage point to 5 percentage points, the average margin of error for the smallest site increases by nearly 50\%.
 
 The state-level analysis produces slightly more promising results.
 Figure \ref{fig:case_study_states_moe} replicates Figure \ref{fig:case_study_moe}, with points being states rather than individual colleges.
-\begin{figure}[ht]
+\begin{figure}[t]
     \centering
     \includegraphics[width=\textwidth]{writeup/images/case_study_states_moe.png}
-    \caption{Average margin of error in case study. Points correspond to prospective sample sizes within 5 states. Dashed black line represents single-site-estimate margins of error.}
+    \caption{Average margin of error in case study with $\tau_j \sim N(0.03, \sigma_\tau$). Points correspond to prospective sample sizes within 5 states. Dashed black line represents single-site-estimate margins of error.}
     \label{fig:case_study_states_moe}
 \end{figure}
-In the best case, MLMs reduce the largest state's average margin of error to approximately 3 percentage points, suggesting that we'd likely be able to detect reasonable effect sizes within that state.
+In the best case, the largest state's average margin of error is roughly 3 percentage points, suggesting that we'd likely be able to detect moderate effect sizes within that state.
 
-The secondary simulation produces similar results, so we only visualize its results for the state-level analysis.
-\begin{figure}[ht]
+The secondary simulation produces similar results, so we only visualize its results for the state-level analysis in Figure \ref{fig:case_study_2_states_moe}.
+\begin{figure}[t]
     \centering
     \includegraphics[width=\textwidth]{writeup/images/case_study2_states_moe.png}
-    \caption{Average margin of error in secondary case study. Points correspond to prospective sample sizes within 5 states. Dashed black line represents single-site-estimate margins of error.}
+    \caption{Average margin of error in case study with $\tau_j \sim Gamma(a,b)$. Points correspond to prospective sample sizes within 5 states. Dashed black line represents single-site-estimate margins of error.}
     \label{fig:case_study_2_states_moe}
 \end{figure}
-Similar to the first simulation, we notice that average margin of error decreases as the tails of the site-level treatment-effect distribution decrease.
+Similar to the first simulation, we notice that average margin of error decreases as the tails of the site-level treatment-effect distribution decrease, i.e., as the sites become more homogeneous.
 We again find that the best-case results in average margins of error of approximately 3 percentage points.
 
-Overall, the case study suggests that it will be challenging to precisely estimate effects within each college or state with the prospective dataset.
+Overall, the case study suggests that it will be challenging to precisely estimate effects within each college or state with the prospective dataset, particularly if there is indeed significant impact variation.
 While average margins of error will vary strongly with the true dispersion of the site-level treatment effects, they are generally larger or on the same order of magnitude as the expected 2-4 percentage point site-level treatment effect.
 Ideally we would increase the site-level sample sizes to improve estimate precision, but regardless, the simulation study helps to set expectations for the possible precision of the site-level treatment-effect estimates.
 
